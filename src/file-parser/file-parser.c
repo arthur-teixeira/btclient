@@ -1,54 +1,7 @@
-#include "deps/stb_hashtable.h"
-#include <openssl/err.h>
-#include <openssl/evp.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "file-parser.h"
 
-unsigned char *compute_info_hash(const char *buf, size_t start, size_t end);
-#define BENCODE_GET_SHA1(a, b, c) compute_info_hash(a, b, c)
-#define BENCODE_HASH_INFO_DICT
 #define BENCODE_IMPLEMENTATION
-#include "deps/stb_bencode.h"
-
-typedef uint8_t piece_hash[20];
-
-typedef enum {
-  INFO_SINGLE,
-  INFO_MULTI,
-} info_mode_t;
-
-typedef struct {
-  size_t length;
-  size_t path_size;
-  char **path;
-} file_info_t;
-
-typedef struct {
-  info_mode_t mode;
-  size_t piece_length;
-  char *name;
-  size_t num_pieces;
-  piece_hash *pieces;
-  bool private;
-  size_t length;
-  size_t files_count;
-  file_info_t *files;
-} info_t;
-
-typedef struct {
-  char *announce;
-  size_t announce_list_size;
-  char **announce_list;
-  info_t info;
-  uint8_t *info_hash;
-} metainfo_t;
-
-#define HT_LOOKUP(ht, key) hash_table_lookup(ht, key, strlen(key))
-#define HT_DELETE(ht, key) hash_table_delete(ht, key, strlen(key))
-
-#define MAX_BUFSIZE 2048
+#include "../deps/stb_bencode.h"
 
 piece_hash *split_piece_hashes(const char *buf, size_t len) {
   size_t hash_len = 20;
@@ -98,15 +51,7 @@ unsigned char *compute_info_hash(const char *in_buf, size_t start, size_t end) {
 }
 
 info_t parse_info(hash_table_t *parsed) {
-  BencodeType *private = HT_LOOKUP(parsed, "private");
   info_t info;
-
-  if (private) {
-    info.private = private->asInt;
-  } else {
-    info.private = false;
-  }
-
   BencodeType *piece_length = HT_LOOKUP(parsed, "piece length");
   info.piece_length = piece_length->asInt;
 
@@ -183,14 +128,4 @@ metainfo_t parse_file(char *filename) {
   metainfo.info = parse_info(&info->asDict);
 
   return metainfo;
-}
-
-int main(int argc, char **argv) {
-  if (argc < 2) {
-    printf("usage: %s [file name]\n", argv[0]);
-    return 0;
-  }
-
-  metainfo_t file = parse_file(argv[1]);
-  return 0;
 }
