@@ -56,13 +56,13 @@ unsigned char *compute_info_hash(const char *in_buf, size_t start, size_t end) {
 
   EVP_DigestInit(ctx, hashptr);
 
-  unsigned char buf[end - start];
+  unsigned char buf[end - start + 1];
 
-  for (size_t i = start, j = 0; i < end; i++, j++) {
+  for (size_t i = start, j = 0; i <= end; i++, j++) {
     buf[j] = in_buf[i];
   }
 
-  EVP_DigestUpdate(ctx, buf, end - start);
+  EVP_DigestUpdate(ctx, buf, end - start + 1);
 
   unsigned int outlen;
   EVP_DigestFinal_ex(ctx, buf, &outlen);
@@ -70,8 +70,6 @@ unsigned char *compute_info_hash(const char *in_buf, size_t start, size_t end) {
 
   unsigned char *outbuf = malloc(outlen);
   memcpy(outbuf, buf, outlen);
-  for (size_t i = 0; i < outlen; ++i)
-    printf("%02x", buf[i]);
   printf("\n");
 
   return outbuf;
@@ -171,10 +169,12 @@ void parse_file(char *filename) {
   metainfo.info = parse_info(&info->asDict);
 
   printf("announce = %s\n", metainfo.announce);
+#if 0
   printf("announce_list = \n");
   for (size_t i = 0; i < metainfo.announce_list_size; i++) {
     printf("%s\n", metainfo.announce_list[i]);
   }
+#endif
 }
 
 int main() {

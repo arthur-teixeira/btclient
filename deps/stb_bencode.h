@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <sys/stat.h>
 
 typedef enum BencodeKind {
   BYTESTRING,
@@ -204,7 +205,8 @@ BencodeType parse_dict(Parser *p) {
 #ifdef BENCODE_HASH_INFO_DICT
     if (parsing_info_dict) {
       assert(p->cur_token.type == END);
-      unsigned char *digest = BENCODE_GET_SHA1(p->l.buf, start_pos, p->cur_token.pos);
+      unsigned char *digest =
+          BENCODE_GET_SHA1(p->l.buf, start_pos, p->cur_token.pos);
       memcpy(value.sha1_digest, digest, 20);
     }
 #endif
@@ -264,6 +266,10 @@ void open_stream(Lexer *l, const char *filename) {
     exit(EXIT_FAILURE);
   }
 
+  struct stat st;
+  stat(filename, &st);
+  l->bufsize = st.st_size;
+
   fread(l->buf, l->bufsize, sizeof(char), f);
   l->input = f;
 }
@@ -272,7 +278,7 @@ Lexer new_lexer(char *filename) {
   Lexer l;
   l.pos = 0;
   l.read_pos = 0;
-  l.bufsize = 10000;
+  l.bufsize = 100000;
   l.buf = calloc(l.bufsize, sizeof(char));
   open_stream(&l, filename);
   return l;
@@ -281,38 +287,12 @@ Lexer new_lexer(char *filename) {
 void free_lexer(Lexer *l) { free(l->buf); }
 
 void read_char(Lexer *l) {
-  if (l->read_pos >= l->bufsize) {
-    if (l->input && !feof(l->input)) {
-      memset(l->buf, 0, l->bufsize);
-      fread(l->buf, l->bufsize, sizeof(char), l->input);
-      l->read_pos = 0;
-      l->pos = 0;
-
-      l->ch = l->buf[l->read_pos];
-    } else {
-      l->ch = 0;
-    }
-  } else {
-    l->ch = l->buf[l->read_pos];
-  }
-
+  l->ch = l->buf[l->read_pos];
   l->pos = l->read_pos;
   l->read_pos++;
 }
 
-char peek_char(Lexer *l) {
-  if (l->read_pos >= l->bufsize) {
-    if (l->input && !feof(l->input)) {
-      char c = fgetc(l->input);
-      ungetc(c, l->input);
-      return c;
-    }
-
-    return '\0';
-  }
-
-  return l->buf[l->read_pos];
-}
+char peek_char(Lexer *l) { return l->buf[l->read_pos]; }
 
 Token next_token(Lexer *l) {
   Token t = {0};
@@ -385,8 +365,6 @@ Token next_token(Lexer *l) {
       }
 
       t.asString[i] = l->ch;
-    } else if (!l->input && (strcmp("\n", &l->ch) || strcmp("\0", &l->ch))) {
-      t.type = END_OF_FILE;
     } else if (l->input && feof(l->input)) {
       t.type = END_OF_FILE;
     }
