@@ -12,6 +12,8 @@ unsigned char *compute_info_hash(const char *buf, size_t start, size_t end);
 #define BENCODE_IMPLEMENTATION
 #include "deps/stb_bencode.h"
 
+typedef uint8_t piece_hash[20];
+
 typedef enum {
   INFO_SINGLE,
   INFO_MULTI,
@@ -26,8 +28,9 @@ typedef struct {
 typedef struct {
   info_mode_t mode;
   size_t piece_length;
-  char *pieces;
   char *name;
+  size_t num_pieces;
+  piece_hash *pieces;
   bool private;
   size_t length;
   size_t files_count;
@@ -38,7 +41,6 @@ typedef struct {
   char *announce;
   size_t announce_list_size;
   char **announce_list;
-  char *encoding;
   info_t info;
   uint8_t *info_hash;
 } metainfo_t;
@@ -47,6 +49,26 @@ typedef struct {
 #define HT_DELETE(ht, key) hash_table_delete(ht, key, strlen(key))
 
 #define MAX_BUFSIZE 2048
+
+piece_hash *split_piece_hashes(const char *buf, size_t len) {
+  size_t hash_len = 20;
+  if (len % hash_len != 0) {
+    fprintf(stderr, "ERROR: malformed hashes\n");
+    exit(EXIT_FAILURE);
+  }
+
+  size_t num_pieces = len / hash_len;
+
+  piece_hash *out = calloc(num_pieces, sizeof(piece_hash));
+
+  for (size_t i = 0; i < num_pieces; i++) {
+    for (size_t j = i * hash_len, k = 0; j < (i + 1) * hash_len; j++, k++) {
+      out[i][k] = buf[j];
+    }
+  }
+
+  return out;
+}
 
 unsigned char *compute_info_hash(const char *in_buf, size_t start, size_t end) {
   OpenSSL_add_all_algorithms();
@@ -89,7 +111,8 @@ info_t parse_info(hash_table_t *parsed) {
   info.piece_length = piece_length->asInt;
 
   BencodeType *pieces = HT_LOOKUP(parsed, "pieces");
-  info.pieces = pieces->asString.str;
+  info.num_pieces = pieces->asString.len / 20;
+  info.pieces = split_piece_hashes(pieces->asString.str, pieces->asString.len);
 
   BencodeType *name = HT_LOOKUP(parsed, "name");
   info.name = name->asString.str;
@@ -125,7 +148,7 @@ info_t parse_info(hash_table_t *parsed) {
   return info;
 }
 
-void parse_file(char *filename) {
+metainfo_t parse_file(char *filename) {
   Lexer l = new_lexer(filename);
   Parser p = new_parser(l);
   hash_table_t parsed = parse_item(&p).asDict;
@@ -155,31 +178,19 @@ void parse_file(char *filename) {
     HT_DELETE(&parsed, "announce-list");
   }
 
-  BencodeType *enc = HT_LOOKUP(&parsed, "encoding");
-  if (enc) {
-    metainfo.encoding = enc->asString.str;
-  }
-
   BencodeType *info = HT_LOOKUP(&parsed, "info");
-  printf("info info_hash:\n");
-  for (size_t i = 0; i < 20; ++i)
-    printf("%02x", info->sha1_digest[i]);
-  printf("\n");
 
   metainfo.info = parse_info(&info->asDict);
 
-  printf("announce = %s\n", metainfo.announce);
-#if 0
-  printf("announce_list = \n");
-  for (size_t i = 0; i < metainfo.announce_list_size; i++) {
-    printf("%s\n", metainfo.announce_list[i]);
-  }
-#endif
+  return metainfo;
 }
 
-int main() {
-  parse_file("../bencode-parser/test-files/"
-             "5B3C4E3CE058F566F9AB3EE8458E9C845FF619FB.torrent");
+int main(int argc, char **argv) {
+  if (argc < 2) {
+    printf("usage: %s [file name]\n", argv[0]);
+    return 0;
+  }
 
+  metainfo_t file = parse_file(argv[1]);
   return 0;
 }
