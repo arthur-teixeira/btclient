@@ -251,10 +251,6 @@ void open_stream(Lexer *l, const char *filename) {
     exit(EXIT_FAILURE);
   }
 
-  struct stat st;
-  stat(filename, &st);
-  l->bufsize = st.st_size;
-
   fread(l->buf, l->bufsize, sizeof(char), f);
   l->input = f;
 }
@@ -263,6 +259,11 @@ Lexer new_lexer(char *filename) {
   Lexer l;
   l.pos = 0;
   l.read_pos = 0;
+
+  struct stat st;
+  stat(filename, &st);
+  l.bufsize = st.st_size;
+
   l.buf = calloc(l.bufsize, sizeof(char));
   open_stream(&l, filename);
   return l;
