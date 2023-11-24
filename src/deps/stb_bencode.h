@@ -81,7 +81,6 @@ typedef struct {
 void open_stream(Lexer *l, const char *filename);
 Token next_token(Lexer *l);
 BencodeType parse_item(Parser *p);
-BencodeList parse(Parser *p);
 void parser_next_token(Parser *p);
 Parser new_parser(Lexer l);
 bool expect_peek(Parser *p, TokenType expected);
@@ -244,20 +243,6 @@ BencodeType parse_item(Parser *p) {
   return e;
 }
 
-BencodeList parse(Parser *p) {
-  BencodeList l = {0};
-  BencodeList *lp = &l;
-
-  da_init(lp, sizeof(BencodeType));
-
-  while (p->cur_token.type != END_OF_FILE) {
-    da_append(lp, parse_item(p));
-    parser_next_token(p);
-  }
-
-  return l;
-}
-
 void open_stream(Lexer *l, const char *filename) {
   FILE *f = fopen(filename, "r");
 
@@ -278,7 +263,6 @@ Lexer new_lexer(char *filename) {
   Lexer l;
   l.pos = 0;
   l.read_pos = 0;
-  l.bufsize = 100000;
   l.buf = calloc(l.bufsize, sizeof(char));
   open_stream(&l, filename);
   return l;
@@ -326,7 +310,18 @@ Token next_token(Lexer *l) {
       break;
     }
   default:
-    if (isdigit(l->ch) || l->ch == '-') {
+    if (l->prevprev.type == STRING_SIZE) {
+      t.type = STRING;
+      size_t n = l->prevprev.asInt;
+      t.asString = calloc(n, sizeof(char));
+
+      size_t i = 0;
+      for (; i < n - 1; i++, read_char(l)) {
+        t.asString[i] = l->ch;
+      }
+
+      t.asString[i] = l->ch;
+    } else if (isdigit(l->ch) || l->ch == '-') {
       char buf[500];
       memset(buf, 0, sizeof(buf));
       size_t i = 0;
@@ -354,17 +349,6 @@ Token next_token(Lexer *l) {
       }
 
       t.asInt = strtol(buf, NULL, 10);
-    } else if (l->prevprev.type == STRING_SIZE) {
-      t.type = STRING;
-      size_t n = l->prevprev.asInt;
-      t.asString = calloc(n, sizeof(char));
-
-      size_t i = 0;
-      for (; i < n - 1; i++, read_char(l)) {
-        t.asString[i] = l->ch;
-      }
-
-      t.asString[i] = l->ch;
     } else if (l->input && feof(l->input)) {
       t.type = END_OF_FILE;
     }
