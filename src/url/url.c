@@ -36,7 +36,7 @@ url_t url_from_string(char *input) {
   }
 
   const char *path = strtok_r(NULL, ":/", &save_ptr);
-  url.path = strdup(path);
+  url.path = strdup(path ? path : "");
 
   return url;
 }
