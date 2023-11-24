@@ -100,18 +100,17 @@ metainfo_t parse_file(char *filename) {
 
   metainfo_t metainfo;
   BencodeType *announce = HT_LOOKUP(&parsed, "announce");
-  if (!announce) {
-    fprintf(stderr, "ERROR: could not find announce in the torrent file");
-    exit(EXIT_FAILURE);
+  if (announce) {
+    metainfo.announce = announce->asString.str;
+    HT_DELETE(&parsed, "announce");
   }
 
-  metainfo.announce = announce->asString.str;
-  HT_DELETE(&parsed, "announce");
-
+  // https://www.bittorrent.org/beps/bep_0012.html
   BencodeType *announce_list = HT_LOOKUP(&parsed, "announce-list");
   if (announce_list) {
     metainfo.announce_list = calloc(announce_list->asList.len, sizeof(void *));
     metainfo.announce_list_size = announce_list->asList.len;
+
     for (size_t i = 0; i < announce_list->asList.len; i++) {
       metainfo.announce_list[i] =
           announce_list->asList.values[i].asList.values[0].asString.str;
