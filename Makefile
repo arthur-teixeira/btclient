@@ -3,7 +3,7 @@ CFLAGS = -Wall -Wextra -g
 SRCDIR = ./src
 BINDIR = ./bin
 SRCEXT = c
-LIBS = -lssl -lcrypto
+LIBS = -lssl -lcrypto -lunity
 
 SRCS := $(shell find ./src ! -name '*_test.c' -type f -name '*.c')
 
@@ -36,7 +36,7 @@ test:
 	@for testfile in $(TESTFILES); do \
 		testname=$$(basename $$testfile .c); \
 		echo "Building $$testname..."; \
-		$(CC) $(LIBS) $(CFLAGS) $(filter-out ./bin/main.o, $(OBJS)) $$testfile -o $(BINDIR)/$$testname; \
+		$(CC) $(CFLAGS) $(filter-out ./bin/main.o, $(OBJS)) $$testfile -o $(BINDIR)/$$testname $(LIBS); \
 		echo "Running $$testname..."; \
 		if ! $(BINDIR)/$$testname; then \
 			failed="$$failed\n$$testname"; \
