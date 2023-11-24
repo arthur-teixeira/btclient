@@ -1,10 +1,11 @@
-CFLAGS = -Wall -Wextra -ggdb
+CC = clang
+CFLAGS = -Wall -Wextra -g 
 SRCDIR = ./src
 BINDIR = ./bin
 SRCEXT = c
+LIBS = -lssl -lcrypto
 
 SRCS := $(shell find ./src ! -name '*_test.c' -type f -name '*.c')
-LIBS = -lssl -lcrypto
 
 OBJS := $(patsubst $(SRCDIR)/%.$(SRCEXT),$(BINDIR)/%.o,$(SRCS))
 
@@ -14,12 +15,40 @@ all: $(BINDIR)/$(BINNAME)
 
 $(BINDIR)/%.o: $(SRCDIR)/%.$(SRCEXT)
 	@mkdir -p $(@D)
-	clang $(CFLAGS) -c $< -o $@ 
+	$(CC) $(CFLAGS) -c $< -o $@ 
 
 $(BINDIR)/$(BINNAME): $(OBJS)
-	clang $(LIBS) $(CFLAGS) $^ -o $@ 
+	$(CC) $(LIBS) $(CFLAGS) $^ -o $@ 
 
 clean:
 	rm -rf $(BINDIR)/*
 
-.PHONY: clean
+run: clean all test
+
+
+TESTFILES := $(shell find ./src -name '*_test.c' -type f)
+
+.ONESHELL:
+
+test:
+	@echo "Building tests..."
+	failed=""
+	@for testfile in $(TESTFILES); do \
+		testname=$$(basename $$testfile .c); \
+		echo "Building $$testname..."; \
+		$(CC) $(LIBS) $(CFLAGS) $(filter-out ./bin/main.o, $(OBJS)) $$testfile -o $(BINDIR)/$$testname; \
+		echo "Running $$testname..."; \
+		if ! $(BINDIR)/$$testname; then \
+			failed="$$failed\n$$testname"; \
+		fi; \
+	done; \
+
+	@if [ -n "$$failed" ]; then \
+		echo "The following tests failed: $$failed"; \
+		exit 1; \
+	else \
+		echo "All tests passed!"; \
+	fi
+
+.PHONY: all test clean run
+
