@@ -1,4 +1,5 @@
 #include "file-parser.h"
+#include <string.h>
 
 #define BENCODE_IMPLEMENTATION
 #include "../deps/stb_bencode.h"
@@ -45,7 +46,6 @@ unsigned char *compute_info_hash(const char *in_buf, size_t start, size_t end) {
 
   unsigned char *outbuf = malloc(outlen);
   memcpy(outbuf, buf, outlen);
-  printf("\n");
 
   return outbuf;
 }
@@ -98,7 +98,7 @@ metainfo_t parse_file(char *filename) {
   Parser p = new_parser(l);
   hash_table_t parsed = parse_item(&p).asDict;
 
-  metainfo_t metainfo;
+  metainfo_t metainfo = {0};
   BencodeType *announce = HT_LOOKUP(&parsed, "announce");
   if (announce) {
     metainfo.announce = announce->asString.str;
@@ -125,6 +125,9 @@ metainfo_t parse_file(char *filename) {
   BencodeType *info = HT_LOOKUP(&parsed, "info");
 
   metainfo.info = parse_info(&info->asDict);
+  for (size_t i = 0; i < 20; i++) {
+    sprintf((char *)&(metainfo.info_hash[i * 2]), "%02x", info->sha1_digest[i]);
+  }
 
   return metainfo;
 }
