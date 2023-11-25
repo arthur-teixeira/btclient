@@ -38,6 +38,7 @@ typedef struct BencodeType {
 } BencodeType;
 
 typedef enum {
+  ILLEGAL,
   LIST_START,
   DICT_START,
   INT_START,
@@ -47,7 +48,6 @@ typedef enum {
   STRING,
   COLON,
   END_OF_FILE,
-  ILLEGAL,
 } TokenType;
 
 typedef struct {

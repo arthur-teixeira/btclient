@@ -6,5 +6,6 @@
 
 int http_announce(int sockfd, url_t *url, tracker_request_t *request);
 size_t build_http_request(url_t *url, tracker_request_t *req, char *buff, size_t bufsize);
+tracker_response_t *parse_content(size_t content_length, char *buf);
 
 #endif // !TRACKER_HTTP_H
