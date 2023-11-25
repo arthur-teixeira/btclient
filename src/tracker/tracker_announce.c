@@ -13,10 +13,8 @@ void tracker_connect() {
   log_set_logfile(stderr);
   log_set_lvl(LOG_DEBUG);
 
-  // url_t url =
-  // url_from_string("https://btclient-test.free.beeceptor.com/test");
+  url_t url = url_from_string("http://tracker.opentrackr.org:1337/announce");
   log_printf(LOG_INFO, "parsing url\n");
-  url_t url = url_from_string("http://0.0.0.0:8000");
 
   log_printf(LOG_INFO, "Getting info from %s\n", url.host);
 
@@ -64,18 +62,22 @@ void tracker_connect() {
   freeaddrinfo(head);
 
   char buf[1024];
-  write(sockfd, "GET / HTTP/1.1\r\n", strlen("GET / HTTP/1.1\r\n"));
-  bzero(buf, 1024);
+
+  char req_buf[1024];
+  sprintf(req_buf, "GET / HTTP/1.1\r\n Host: %s\r\n\r\n", url.host);
+  write(sockfd, req_buf, strlen(req_buf));
+  memset(buf, 0, 1024);
 
   while (read(sockfd, buf, 1023) != 0) {
     fprintf(stderr, "%s", buf);
-    bzero(buf, 1024);
+    memset(buf, 0, 1024);
   }
 
   shutdown(sockfd, SHUT_RDWR);
   close(sockfd);
 
   return;
+
 fail:
   freeaddrinfo(head);
   return;
