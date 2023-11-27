@@ -1,5 +1,6 @@
 #include "tracker_announce.h"
 #include "tracker_http.h"
+#include <sys/socket.h>
 
 int tracker_connect(url_t *url, tracker_request_t *request) {
   log_printf(LOG_INFO, "parsing url\n");
@@ -50,9 +51,11 @@ int tracker_connect(url_t *url, tracker_request_t *request) {
 
   freeaddrinfo(head);
 
+  tracker_response_t *res;
   switch (url->protocol) {
   case PROTOCOL_HTTP:
-    return http_announce(sockfd, url, request);
+    // TODO: return response
+    res = http_announce(sockfd, url, request);
   case PROTOCOL_UDP:
   case PROTOCOL_HTTPS:
     assert(0 && "TODO");
@@ -60,6 +63,11 @@ int tracker_connect(url_t *url, tracker_request_t *request) {
     log_printf(LOG_ERROR, "Unknown protocol for tracker %s\n", url->host);
     return -1;
   }
+
+  shutdown(sockfd, SHUT_RDWR);
+  close(sockfd);
+
+  return 0;
 
 fail:
   freeaddrinfo(head);

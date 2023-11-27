@@ -41,7 +41,7 @@ typedef struct {
 } tracker_request_t;
 
 typedef struct {
-    char *ip;
+    uint32_t ip;
     uint16_t port;
 } peer_t;
 
