@@ -43,13 +43,13 @@ size_t build_http_request(url_t *url, tracker_request_t *req, char *buff,
   written += snprintf(buff, bufsize, "GET /%s", url->path);
 
   written += snprintf(buff + written, bufsize - written, "?info_hash=");
-  char *info_hash_escaped = curl_easy_escape(NULL, req->info_hash, 20);
+  char *info_hash_escaped = curl_easy_escape(NULL, req->info_hash, sizeof(req->info_hash));
   written +=
       snprintf(buff + written, bufsize - written, "%s", info_hash_escaped);
   curl_free(info_hash_escaped);
 
   written += snprintf(buff + written, bufsize - written, "&peer_id=");
-  char *peer_id_escaped = curl_easy_escape(NULL, req->peer_id, 20);
+  char *peer_id_escaped = curl_easy_escape(NULL, req->peer_id, sizeof(req->peer_id));
   written += snprintf(buff + written, bufsize - written, "%s", peer_id_escaped);
   curl_free(peer_id_escaped);
 

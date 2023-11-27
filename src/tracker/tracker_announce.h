@@ -12,6 +12,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <openssl/sha.h>
 
 typedef enum {
   EVENT_STARTED,
@@ -30,8 +31,8 @@ enum {
 
 typedef struct {
   uint8_t flags;
-  char info_hash[20];
-  char peer_id[20];
+  char info_hash[SHA_DIGEST_LENGTH * 2];
+  char peer_id[SHA_DIGEST_LENGTH * 2];
   uint16_t port;
   size_t uploaded;
   size_t downloaded;

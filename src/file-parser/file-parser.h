@@ -3,6 +3,7 @@
 
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/sha.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,7 +14,7 @@ unsigned char *compute_info_hash(const char *buf, size_t start, size_t end);
 #define BENCODE_HASH_INFO_DICT
 #include "../deps/stb_bencode.h"
 
-typedef uint8_t piece_hash[20];
+typedef uint8_t piece_hash[SHA_DIGEST_LENGTH];
 
 typedef enum {
   INFO_SINGLE,
@@ -42,7 +43,7 @@ typedef struct {
   size_t announce_list_size;
   char **announce_list;
   info_t info;
-  char info_hash[20];
+  char info_hash[SHA_DIGEST_LENGTH * 2];
 } metainfo_t;
 
 #define HT_LOOKUP(ht, key) hash_table_lookup(ht, key, strlen(key))

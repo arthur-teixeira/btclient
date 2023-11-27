@@ -1,22 +1,22 @@
 #include "file-parser.h"
+#include <stdio.h>
 #include <string.h>
 
 #define BENCODE_IMPLEMENTATION
 #include "../deps/stb_bencode.h"
 
 piece_hash *split_piece_hashes(const char *buf, size_t len) {
-  size_t hash_len = 20;
-  if (len % hash_len != 0) {
+  if (len % SHA_DIGEST_LENGTH != 0) {
     fprintf(stderr, "ERROR: malformed hashes\n");
     exit(EXIT_FAILURE);
   }
 
-  size_t num_pieces = len / hash_len;
+  size_t num_pieces = len / SHA_DIGEST_LENGTH;
 
   piece_hash *out = calloc(num_pieces, sizeof(piece_hash));
 
   for (size_t i = 0; i < num_pieces; i++) {
-    for (size_t j = i * hash_len, k = 0; j < (i + 1) * hash_len; j++, k++) {
+    for (size_t j = i * SHA_DIGEST_LENGTH, k = 0; j < (i + 1) * SHA_DIGEST_LENGTH; j++, k++) {
       out[i][k] = buf[j];
     }
   }
@@ -56,7 +56,7 @@ info_t parse_info(hash_table_t *parsed) {
   info.piece_length = piece_length->asInt;
 
   BencodeType *pieces = HT_LOOKUP(parsed, "pieces");
-  info.num_pieces = pieces->asString.len / 20;
+  info.num_pieces = pieces->asString.len / SHA_DIGEST_LENGTH;
   info.pieces = split_piece_hashes(pieces->asString.str, pieces->asString.len);
 
   BencodeType *name = HT_LOOKUP(parsed, "name");
@@ -125,8 +125,9 @@ metainfo_t parse_file(char *filename) {
   BencodeType *info = HT_LOOKUP(&parsed, "info");
 
   metainfo.info = parse_info(&info->asDict);
-  for (size_t i = 0; i < 20; i++) {
-    sprintf((char *)&(metainfo.info_hash[i * 2]), "%02x", info->sha1_digest[i]);
+  for (size_t i = 0; i < SHA_DIGEST_LENGTH; i++) {
+    snprintf((char *)&(metainfo.info_hash[i * 2]), sizeof(metainfo.info_hash),
+             "%02x", info->sha1_digest[i]);
   }
 
   return metainfo;

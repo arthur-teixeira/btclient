@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <sys/stat.h>
 
+#define SHA1_LENGTH 20
+
 typedef enum BencodeKind {
   BYTESTRING,
   INTEGER,
@@ -28,7 +30,7 @@ typedef struct BencodeString {
 
 typedef struct BencodeType {
   BencodeKind kind;
-  unsigned char sha1_digest[20];
+  unsigned char sha1_digest[SHA1_LENGTH];
   union {
     BencodeString asString;
     long asInt;
@@ -206,7 +208,7 @@ BencodeType parse_dict(Parser *p) {
       assert(p->cur_token.type == END);
       unsigned char *digest =
           BENCODE_GET_SHA1(p->l.buf, start_pos, p->cur_token.pos);
-      memcpy(value.sha1_digest, digest, 20);
+      memcpy(value.sha1_digest, digest, SHA1_LENGTH);
     }
 #endif
 

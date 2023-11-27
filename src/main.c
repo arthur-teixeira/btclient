@@ -21,11 +21,10 @@ int main(int argc, char **argv) {
   metainfo_t file = parse_file(argv[1]);
 
   log_printf(LOG_INFO, "Parsing announce url\n");
-  url_t announce_url =
-      url_from_string("http://tracker.opentrackr.org:1337/announce");
+  url_t announce_url = url_from_string("http://tracker.opentrackr.org:1337/announce");
   // TODO: use url from file, not doing that now because we still don't support
   // UDP url_t announce_url = file.announce ? url_from_string(file.announce) :
-  // url_from_string(file.announce_list[0]);
+  url_from_string(file.announce_list[0]);
 
   log_printf(LOG_INFO, "Building request\n");
   tracker_request_t *req = build_tracker_announce_request(&file);
