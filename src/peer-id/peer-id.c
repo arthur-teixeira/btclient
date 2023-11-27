@@ -1,10 +1,11 @@
 #include "peer-id.h"
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/sha.h>
 #include <string.h>
 #include <unistd.h>
 
-char peer_id[2 * SHA_DIGEST_LENGTH];
+char peer_id[SHA_DIGEST_LENGTH];
 
 void create_peer_id() {
   int pid = getpid();
@@ -30,7 +31,6 @@ void create_peer_id() {
   unsigned int outlen;
   EVP_DigestFinal_ex(ctx, buf, &outlen);
   EVP_MD_CTX_free(ctx);
-  for (size_t i = 0; i < SHA_DIGEST_LENGTH; i++) {
-    snprintf((char *)&(peer_id[i * 2]), sizeof(peer_id), "%02x", buf[i]);
-  }
+
+  memcpy(peer_id, buf, SHA_DIGEST_LENGTH);
 }

@@ -28,6 +28,7 @@ int http_announce(int sockfd, url_t *url, tracker_request_t *req) {
     total_received += n;
   } while (n > 0);
 
+  log_printf(LOG_DEBUG, "\nBEGIN HTTP RESPONSE\n%s\nEND HTTP RESPONSE\n", buf);
   assert(total_received < 2048);
 
   shutdown(sockfd, SHUT_RDWR);

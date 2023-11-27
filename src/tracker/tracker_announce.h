@@ -31,8 +31,8 @@ enum {
 
 typedef struct {
   uint8_t flags;
-  char info_hash[SHA_DIGEST_LENGTH * 2];
-  char peer_id[SHA_DIGEST_LENGTH * 2];
+  char info_hash[SHA_DIGEST_LENGTH];
+  char peer_id[SHA_DIGEST_LENGTH];
   uint16_t port;
   size_t uploaded;
   size_t downloaded;

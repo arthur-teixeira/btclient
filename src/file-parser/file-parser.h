@@ -43,7 +43,7 @@ typedef struct {
   size_t announce_list_size;
   char **announce_list;
   info_t info;
-  char info_hash[SHA_DIGEST_LENGTH * 2];
+  char info_hash[SHA_DIGEST_LENGTH];
 } metainfo_t;
 
 #define HT_LOOKUP(ht, key) hash_table_lookup(ht, key, strlen(key))

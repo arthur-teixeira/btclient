@@ -1,4 +1,5 @@
 #include "file-parser.h"
+#include <openssl/sha.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -16,7 +17,8 @@ piece_hash *split_piece_hashes(const char *buf, size_t len) {
   piece_hash *out = calloc(num_pieces, sizeof(piece_hash));
 
   for (size_t i = 0; i < num_pieces; i++) {
-    for (size_t j = i * SHA_DIGEST_LENGTH, k = 0; j < (i + 1) * SHA_DIGEST_LENGTH; j++, k++) {
+    for (size_t j = i * SHA_DIGEST_LENGTH, k = 0;
+         j < (i + 1) * SHA_DIGEST_LENGTH; j++, k++) {
       out[i][k] = buf[j];
     }
   }
@@ -125,10 +127,6 @@ metainfo_t parse_file(char *filename) {
   BencodeType *info = HT_LOOKUP(&parsed, "info");
 
   metainfo.info = parse_info(&info->asDict);
-  for (size_t i = 0; i < SHA_DIGEST_LENGTH; i++) {
-    snprintf((char *)&(metainfo.info_hash[i * 2]), sizeof(metainfo.info_hash),
-             "%02x", info->sha1_digest[i]);
-  }
-
+  memcpy(metainfo.info_hash, info->sha1_digest, SHA_DIGEST_LENGTH);
   return metainfo;
 }
