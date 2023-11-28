@@ -24,12 +24,11 @@ int main(int argc, char **argv) {
   url_t announce_url = url_from_string("http://tracker.opentrackr.org:1337/announce");
   // TODO: use url from file, not doing that now because we still don't support
   // UDP url_t announce_url = file.announce ? url_from_string(file.announce) :
-  url_from_string(file.announce_list[0]);
 
   log_printf(LOG_INFO, "Building request\n");
   tracker_request_t *req = build_tracker_announce_request(&file);
 
   log_printf(LOG_INFO, "Connecting \n");
-  tracker_connect(&announce_url, req);
+  tracker_announce(&announce_url, req);
   return 0;
 }

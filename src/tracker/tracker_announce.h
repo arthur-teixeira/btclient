@@ -56,6 +56,7 @@ typedef struct {
     peer_t *peers;
 } tracker_response_t;
 
-int tracker_connect(url_t *url, tracker_request_t *request);
+int tracker_connect(url_t *url);
+tracker_response_t *tracker_announce(url_t *url, tracker_request_t *req);
 
 #endif // TRACKER_ANNOUNCE_H
