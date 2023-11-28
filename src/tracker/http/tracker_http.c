@@ -1,6 +1,7 @@
 #include "tracker_http.h"
-#include "../deps/stb_bencode.h"
-#include "tracker_announce.h"
+#include "../../deps/stb_bencode.h"
+#include "../peer_parser.h"
+#include "../tracker_announce.h"
 #include <ctype.h>
 #include <curl/curl.h>
 #include <stdbool.h>
@@ -108,27 +109,6 @@ tracker_response_t *parse_tracker_response(char *buf, size_t bufsize) {
   return parse_content(content_length, content);
 }
 
-peer_t *parse_peers(const BencodeString *restrict buf, size_t *peer_count_out) {
-  assert(buf->len % 6 == 0);
-  size_t peer_count = buf->len / 6;
-
-  peer_t *peers = calloc(peer_count, sizeof(peer_t));
-
-  for (size_t i = 0; i < peer_count; i++) {
-    uint32_t ip;
-    memcpy(&ip, buf->str + (6 * i), sizeof(uint32_t));
-
-    uint16_t port;
-    memcpy(&port, buf->str + (6 * i) + sizeof(uint32_t), sizeof(uint16_t));
-
-    peers[i].ip = ntohl(ip);
-    peers[i].port = ntohs(port);
-  }
-
-  *peer_count_out = peer_count;
-  return peers;
-}
-
 tracker_response_t *parse_content(size_t content_length, char *buf) {
   tracker_response_t *res = malloc(sizeof(tracker_response_t));
   Lexer l = {0};
@@ -148,21 +128,26 @@ tracker_response_t *parse_content(size_t content_length, char *buf) {
 
   BencodeType *failure_reason = HT_LOOKUP(&dict, "failure reason");
   if (failure_reason) {
+    log_printf(LOG_ERROR, "Error on tracker response: %s\n",
+               failure_reason->asString.str);
     res->failure_reason = failure_reason->asString.str;
   }
 
   BencodeType *warning_message = HT_LOOKUP(&dict, "warning message");
   if (warning_message) {
+    log_printf(LOG_WARNING, "Tracker response warning: %\n",
+               warning_message->asString.str);
     res->warning_message = warning_message->asString.str;
   }
 
   res->interval = ((BencodeType *)HT_LOOKUP(&dict, "interval"))->asInt;
   res->complete = ((BencodeType *)HT_LOOKUP(&dict, "complete"))->asInt;
   res->incomplete = ((BencodeType *)HT_LOOKUP(&dict, "incomplete"))->asInt;
+  BencodeType *peers = HT_LOOKUP(&dict, "peers");
 
-  size_t peer_count;
-  peer_t *peers = parse_peers(
-      &((BencodeType *)HT_LOOKUP(&dict, "peers"))->asString, &peer_count);
+  assert(peers->asString.len % 6 == 0);
+  res->num_peers = peers->asString.len / 6;
+  res->peers = parse_peers(peers->asString.str, res->num_peers);
 
   return res;
 }
