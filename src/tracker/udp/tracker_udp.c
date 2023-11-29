@@ -62,7 +62,7 @@ typedef struct __attribute__((packed)) {
   char message[];
 } udp_announce_err_header_t;
 
-int new_transaction_id() {
+uint32_t new_transaction_id() {
   unsigned int seed = time(NULL);
   return rand_r(&seed);
 }
@@ -72,7 +72,7 @@ int udp_send_dgram(int sockfd, char *buf, size_t buf_len) {
   if (bytes_sent < 0)
     return -1;
 
-  assert(bytes_sent == buf_len);
+  assert(bytes_sent == (ssize_t)buf_len);
   return 0;
 }
 
@@ -130,11 +130,11 @@ int udp_tryannounce(int sockfd, time_t timeout, udp_announce_req_t *req,
 time_t timeout(int n) { return 30 * (1 << n); }
 
 void fill_announce_request(tracker_request_t *req, udp_announce_req_t *out,
-                           int connection_id, int transaction_id) {
-  out->connection_id = htonl(connection_id);
+                           uint64_t connection_id, uint32_t transaction_id) {
+  out->connection_id = connection_id;
+  out->transaction_id = transaction_id;
   out->action = htonl(ACTION_ANNOUNCE);
   out->left = htonl(req->left);
-  out->transaction_id = htonl(transaction_id);
   out->key = 0;
   out->port = htonl(req->port);
   out->event = htonl(req->event);
@@ -148,7 +148,7 @@ void fill_announce_request(tracker_request_t *req, udp_announce_req_t *out,
 
 tracker_response_t *udp_announce(int sockfd, tracker_request_t *req) {
   int n = 0;
-  int transaction_id = new_transaction_id();
+  uint32_t transaction_id = new_transaction_id();
   udp_connect_res_t res;
   size_t dgram_size;
 
@@ -188,8 +188,6 @@ reconnect:
     return NULL;
   }
 
-  transaction_id = new_transaction_id();
-
   udp_announce_req_t announce_req;
   fill_announce_request(req, &announce_req, res.connection_id, transaction_id);
 
@@ -197,7 +195,7 @@ reconnect:
     udp_announce_res_header_t header;
     udp_announce_err_header_t err_header;
     char all[MAX_RECV_BUFSIZE];
-  } announce_response;
+  } announce_response = {0};
 
   while (udp_tryannounce(sockfd, timeout(n++), &announce_req,
                          announce_response.all, &dgram_size)) {
@@ -222,7 +220,7 @@ reconnect:
     return NULL;
   }
 
-  if (announce_response.header.action == ACTION_ERROR) {
+  if (ntohs(announce_response.header.action) == ACTION_ERROR) {
     log_printf(LOG_ERROR, "Received error from the tracker: %.*s\n",
                dgram_size - sizeof(udp_announce_err_header_t),
                announce_response.err_header.message);
@@ -240,11 +238,11 @@ reconnect:
   log_printf(LOG_INFO, "Successfully connected to UDP tracker\n");
 
   tracker_response_t *response = malloc(sizeof(tracker_response_t));
-  response->complete = announce_response.header.seeders;
-  response->incomplete = announce_response.header.leechers;
+  response->complete = ntohs(announce_response.header.seeders);
+  response->incomplete = ntohs(announce_response.header.leechers);
   response->failure_reason = NULL;
   response->warning_message = NULL;
-  response->interval = announce_response.header.interval;
+  response->interval = ntohs(announce_response.header.interval);
   response->tracker_id = NULL;
 
   size_t peer_buf_len = dgram_size - sizeof(announce_response.header);

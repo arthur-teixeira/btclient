@@ -1,5 +1,5 @@
 CC = clang
-CFLAGS = -Wall -Wextra -g 
+CFLAGS = -Wall -Wextra -ggdb
 SRCDIR = ./src
 BINDIR = ./bin
 SRCEXT = c

@@ -37,7 +37,7 @@ tracker_response_t *http_announce(int sockfd, url_t *url,
   log_printf(LOG_DEBUG, "\nBEGIN HTTP RESPONSE\n%s\nEND HTTP RESPONSE\n", buf);
   assert(total_received < 2048);
 
-  tracker_response_t *res = parse_tracker_response(buf, total_received);
+  tracker_response_t *res = parse_tracker_response(buf);
 
   return res;
 }
@@ -80,7 +80,7 @@ size_t build_http_request(url_t *url, tracker_request_t *req, char *buff,
   return written;
 }
 
-tracker_response_t *parse_tracker_response(char *buf, size_t bufsize) {
+tracker_response_t *parse_tracker_response(char *buf) {
   char *saveptr;
   char *line = strtok_r(buf, "\n", &saveptr);
 

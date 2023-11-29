@@ -23,6 +23,23 @@ void log_set_logfile(FILE *f) {
   // pthread_mutex_unlock(&log_lock);
 }
 
+#define LIST_OF_LEVELS                                                         \
+  X(LOG_INFO)                                                                  \
+  X(LOG_DEBUG)                                                                 \
+  X(LOG_WARNING)                                                               \
+  X(LOG_ERROR)                                                                 \
+  X(LOG_NONE)
+
+char *print_level(log_level_t lvl) {
+  switch (lvl) {
+#define X(name)                                                                \
+  case name:                                                                   \
+    return #name;
+    LIST_OF_LEVELS
+#undef X
+  }
+}
+
 void log_printf(log_level_t lvl, const char *fmt, ...) {
   va_list args;
   time_t now = time(0);
@@ -37,7 +54,8 @@ void log_printf(log_level_t lvl, const char *fmt, ...) {
 
   // pthread_mutex_lock(&log_lock);
 
-  fprintf(log_file, "[%.*s] [%05ld] ", 8, timestr, tid);
+  fprintf(log_file, "[%s] - [%.*s] [%05ld] ", print_level(lvl), 8, timestr,
+          tid);
   switch (lvl) {
   case LOG_WARNING:
     fprintf(log_file, "WARNING: ");
