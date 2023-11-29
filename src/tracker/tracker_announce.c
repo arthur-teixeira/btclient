@@ -1,5 +1,6 @@
 #include "tracker_announce.h"
 #include "http/tracker_http.h"
+#include "https/tracker_https.h"
 #include "udp/tracker_udp.h"
 #include <sys/socket.h>
 
@@ -60,6 +61,10 @@ fail:
 }
 
 tracker_response_t *tracker_announce(url_t *url, tracker_request_t *req) {
+  if (url->protocol == PROTOCOL_HTTPS) {
+    return https_announce(url, req);
+  }
+
   int sockfd = tracker_connect(url);
   if (sockfd < 0) {
     return NULL;
@@ -74,7 +79,7 @@ tracker_response_t *tracker_announce(url_t *url, tracker_request_t *req) {
     res = udp_announce(sockfd, req);
     break;
   case PROTOCOL_HTTPS:
-    assert(0 && "TODO");
+    assert(0 && "unreachable");
   case PROTOCOL_UNKNOWN:
     log_printf(LOG_ERROR, "Unknown protocol for tracker %s\n", url->host);
     return NULL;
