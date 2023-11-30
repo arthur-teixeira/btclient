@@ -42,11 +42,8 @@ tracker_response_t *http_announce(int sockfd, url_t *url,
   return res;
 }
 
-size_t build_http_request(url_t *url, tracker_request_t *req, char *buff,
-                          size_t bufsize) {
+size_t build_http_url(tracker_request_t *req, char *buff, size_t bufsize) {
   size_t written = 0;
-
-  written += snprintf(buff, bufsize, "GET /%s", url->path);
 
   written += snprintf(buff + written, bufsize - written, "?info_hash=");
   char *info_hash_escaped =
@@ -73,6 +70,17 @@ size_t build_http_request(url_t *url, tracker_request_t *req, char *buff,
   if (HAS_FLAG(req, COMPACT)) {
     written += snprintf(buff + written, bufsize - written, "&compact=1");
   }
+
+  return written;
+}
+
+size_t build_http_request(url_t *url, tracker_request_t *req, char *buff,
+                          size_t bufsize) {
+  size_t written = 0;
+
+  written += snprintf(buff, bufsize, "GET /%s", url->path);
+
+  written += build_http_url(req, buff + written, bufsize - written);
   written += snprintf(buff + written, bufsize - written, " HTTP/1.1\r\n");
   written += snprintf(buff + written, bufsize - written, "Host: %s\r\n\r\n",
                       url->host);
@@ -131,6 +139,8 @@ tracker_response_t *parse_content(size_t content_length, char *buf) {
     log_printf(LOG_ERROR, "Error on tracker response: %s\n",
                failure_reason->asString.str);
     res->failure_reason = failure_reason->asString.str;
+
+    return res;
   }
 
   BencodeType *warning_message = HT_LOOKUP(&dict, "warning message");

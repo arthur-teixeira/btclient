@@ -1,69 +1,61 @@
 #include "tracker_https.h"
 #include "../http/tracker_http.h"
+#include <curl/curl.h>
+#include <curl/easy.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <string.h>
 #include <unistd.h>
 
+typedef struct {
+  char data[4096];
+  size_t size;
+} curl_response_t;
+
+size_t write_callback(char *ptr, size_t size, size_t nmemb, void *userdata) {
+  curl_response_t *res = (curl_response_t *)userdata;
+  res->size = size * nmemb;
+  assert(res->size <= 4096);
+  memcpy(res->data, ptr, res->size);
+
+  return res->size;
+}
+
 tracker_response_t *https_announce(url_t *url, tracker_request_t *req) {
-  SSL_library_init();
-
-  SSL_CTX *ctx = SSL_CTX_new(SSLv23_client_method());
-  if (!ctx) {
-    log_printf(LOG_ERROR, "Could not create SSL context\n");
+  CURL *curl = curl_easy_init();
+  if (!curl) {
+    log_printf(LOG_ERROR, "Could not create Curl instance\n");
     return NULL;
   }
 
-  char port[strlen(url->host) + 6];
-  int nb = snprintf(port, sizeof(port), "%s:%hu", url->host, url->port);
-  port[nb] = '\0';
+  char req_buf[1024];
+  int nb = snprintf(req_buf, sizeof(req_buf), "https://%s:%hu/%s", url->host,
+                    url->port, url->path);
+  nb += build_http_url(req, req_buf + nb, sizeof(req_buf) - nb);
+  req_buf[nb] = 0;
+  curl_response_t response = {0};
 
-  BIO *bio = BIO_new_ssl_connect(ctx);
-  BIO_set_conn_hostname(bio, port);
+  curl_easy_setopt(curl, CURLOPT_STDERR, log_file);
+  curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+  curl_easy_setopt(curl, CURLOPT_URL, req_buf);
+  curl_easy_setopt(curl, CURLOPT_CA_CACHE_TIMEOUT, 604800L);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
-  if (BIO_do_connect(bio) <= 0) {
-    log_printf(LOG_ERROR, "Could not connect to tracker\n");
-    return NULL;
-  }
-  log_printf(LOG_INFO, "Connected to HTTPS tracker\n");
-
-  char req_buf[1024] = {0};
-  size_t req_size = build_http_request(url, req, req_buf, sizeof(req_buf));
-  log_printf(LOG_DEBUG, "\nBEGIN HTTPS REQUEST\n%s\nEND HTTPS REQUEST\n",
-             req_buf);
-
-retry:
-  if (BIO_write(bio, req_buf, req_size <= 0)) {
-    log_printf(LOG_ERROR, "Could not write to HTTPS tracker\n");
-    if (BIO_should_retry(bio)) {
-      log_printf(LOG_DEBUG, "Retrying write...\n");
-      sleep(5);
-      goto retry;
-    }
-
-    return NULL;
+  CURLcode res = curl_easy_perform(curl);
+  if (res != CURLE_OK) {
+    goto error;
   }
 
-  char buf[2048] = {0};
-  size_t n;
-  size_t total_received = 0;
-  do {
-    n = BIO_read(bio, buf + total_received, sizeof(buf) - total_received);
-    if (n < 0) {
-      log_printf(LOG_ERROR, "Could not read from stream\n");
-      return NULL;
-    }
+  curl_global_cleanup();
 
-    total_received += n;
-  } while (n > 0);
+  return parse_content(response.size, response.data);
 
-  log_printf(LOG_DEBUG, "\nBEGIN HTTPS RESPONSE\n%s\nEND HTTPS RESPONSE\n",
-             buf);
-  assert(total_received < 2048);
+error:
+  log_printf(LOG_ERROR, "Request failed: %s\n", curl_easy_strerror(res));
+  curl_easy_cleanup(curl);
+  curl_global_cleanup();
 
-  BIO_free_all(bio);
-  SSL_CTX_free(ctx);
-
-  tracker_response_t *res = parse_tracker_response(buf);
-  return res;
+  return NULL;
 }

@@ -12,6 +12,8 @@ typedef enum{
 
 #define DEFAULT_LOG_LVL LOG_INFO
 
+extern FILE *log_file;
+
 void log_set_lvl(log_level_t lvl);
 void log_set_logfile(FILE *f);
 void log_printf(log_level_t lvl, const char *fmt, ...);
