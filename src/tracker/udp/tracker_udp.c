@@ -220,7 +220,7 @@ reconnect:
     return NULL;
   }
 
-  if (ntohs(announce_response.header.action) == ACTION_ERROR) {
+  if (ntohl(announce_response.header.action) == ACTION_ERROR) {
     log_printf(LOG_ERROR, "Received error from the tracker: %.*s\n",
                dgram_size - sizeof(udp_announce_err_header_t),
                announce_response.err_header.message);
@@ -238,11 +238,11 @@ reconnect:
   log_printf(LOG_INFO, "Successfully connected to UDP tracker\n");
 
   tracker_response_t *response = malloc(sizeof(tracker_response_t));
-  response->complete = ntohs(announce_response.header.seeders);
-  response->incomplete = ntohs(announce_response.header.leechers);
+  response->complete = ntohl(announce_response.header.seeders);
+  response->incomplete = ntohl(announce_response.header.leechers);
   response->failure_reason = NULL;
   response->warning_message = NULL;
-  response->interval = ntohs(announce_response.header.interval);
+  response->interval = ntohl(announce_response.header.interval);
   response->tracker_id = NULL;
 
   size_t peer_buf_len = dgram_size - sizeof(announce_response.header);

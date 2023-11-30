@@ -1,3 +1,4 @@
+#include "../peer-msg/peer_msg.h"
 #include "peer-connection.h"
 #include <arpa/inet.h>
 #include <asm-generic/errno.h>
@@ -24,6 +25,18 @@ void peer_connection_cleanup(void *arg) {
   log_printf(LOG_INFO, "Closed peer connection %s\n", ipstr);
 
   free(arg);
+}
+
+int handshake(int sockfd, char info_hash[20], char out_peer_id[20]) {
+  if (peer_send_handshake(sockfd, info_hash) < 0) {
+    return -1;
+  }
+
+  if (peer_recv_handshake(sockfd, info_hash, out_peer_id) < 0) {
+    return -1;
+  }
+
+  return 0;
 }
 
 int peer_connect(peer_arg_t *arg) {
@@ -61,6 +74,9 @@ int peer_connect(peer_arg_t *arg) {
     return -1;
   }
 
+  setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(struct timeval));
+  setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(struct timeval));
+
   int opts = fcntl(sockfd, F_GETFL);
   opts &= ~O_NONBLOCK;
   fcntl(sockfd, F_SETFL, opts);
@@ -88,6 +104,15 @@ void *peer_connection(void *arg) {
     } else {
       sockfd = parg->sockfd;
     }
+
+    char out_peer_id[20];
+    if (handshake(sockfd, parg->torrent->info_hash, out_peer_id) < 0) {
+      log_printf(LOG_ERROR, "Handshake failed\n");
+      goto fail_init;
+    };
+
+    log_printf(LOG_INFO, "Successful handshake with peer %s\n", out_peer_id);
+
   fail_init:;
   };
   pthread_cleanup_pop(1);

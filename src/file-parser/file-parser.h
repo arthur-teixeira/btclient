@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
-#include "../peer-connection/peer-connection.h"
+#include "../tracker/tracker_announce.h"
 
 unsigned char *compute_info_hash(const char *buf, size_t start, size_t end);
 #define BENCODE_GET_SHA1(a, b, c) compute_info_hash(a, b, c)
@@ -39,6 +39,11 @@ typedef struct {
   size_t files_count;
   file_info_t *files;
 } info_t;
+
+typedef struct {
+  peer_t peer;
+  pthread_t thread;
+} peer_connection_t;
 
 typedef struct metainfo_t {
   char *announce;

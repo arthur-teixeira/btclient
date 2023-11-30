@@ -71,6 +71,7 @@ int main(int argc, char **argv) {
 
     tracker_response_t *res = tracker_announce(&announce_url, req);
     if (res) {
+      log_printf(LOG_DEBUG, "Tracker interval is %ld\n", res->interval);
       interval = res->interval;
       for (size_t i = 0; i < res->num_peers; i++) {
         create_peer_connection(&res->peers[i], &file);
@@ -86,6 +87,7 @@ int main(int argc, char **argv) {
       free(res);
     }
 
+    log_printf(LOG_DEBUG, "Sleeping for %ld\n", interval);
     sleep(interval);
   }
 

@@ -1,15 +1,11 @@
 #ifndef PEER_CONNECTION_H
 #define PEER_CONNECTION_H
 #include "../tracker/peer_parser.h"
+#include "../file-parser/file-parser.h"
 #include <pthread.h>
 
 typedef struct {
-  peer_t peer;
-  pthread_t thread;
-} peer_connection_t;
-
-typedef struct {
-  struct metainfo_t *torrent;
+  metainfo_t *torrent;
   peer_t peer;
   int sockfd;
 } peer_arg_t;
