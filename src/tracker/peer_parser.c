@@ -11,8 +11,13 @@ peer_t *parse_peers(const char *buf, size_t peer_count) {
     uint16_t port;
     memcpy(&port, buf + (6 * i) + sizeof(uint32_t), sizeof(uint16_t));
 
-    peers[i].ip = ntohl(ip);
-    peers[i].port = ntohs(port);
+    peers[i].addr.sas.ss_family = AF_INET;
+    peers[i].addr.sa_in.sin_addr.s_addr = ip;
+    peers[i].addr.sa_in.sin_port = port;
+    memset(peers[i].addr.sa_in.sin_zero, 0,
+           sizeof(peers[i].addr.sa_in.sin_zero));
+
+    memset(peers[i].peer_id, 0, sizeof(peers[i].peer_id));
   }
 
   return peers;

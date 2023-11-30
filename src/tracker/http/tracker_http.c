@@ -155,6 +155,15 @@ tracker_response_t *parse_content(size_t content_length, char *buf) {
   res->incomplete = ((BencodeType *)HT_LOOKUP(&dict, "incomplete"))->asInt;
   BencodeType *peers = HT_LOOKUP(&dict, "peers");
 
+  if (!peers) {
+    log_printf(LOG_WARNING, "Tracker returned no peers\n");
+
+    res->num_peers = 0;
+    res->peers = NULL;
+
+    return res;
+  }
+
   assert(peers->asString.len % 6 == 0);
   res->num_peers = peers->asString.len / 6;
   res->peers = parse_peers(peers->asString.str, res->num_peers);

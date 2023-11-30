@@ -45,17 +45,13 @@ tracker_response_t *https_announce(url_t *url, tracker_request_t *req) {
 
   CURLcode res = curl_easy_perform(curl);
   if (res != CURLE_OK) {
-    goto error;
+    log_printf(LOG_ERROR, "Request failed: %s\n", curl_easy_strerror(res));
+    curl_easy_cleanup(curl);
+    curl_global_cleanup();
+    return NULL;
   }
 
   curl_global_cleanup();
 
   return parse_content(response.size, response.data);
-
-error:
-  log_printf(LOG_ERROR, "Request failed: %s\n", curl_easy_strerror(res));
-  curl_easy_cleanup(curl);
-  curl_global_cleanup();
-
-  return NULL;
 }

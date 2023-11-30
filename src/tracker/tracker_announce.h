@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <netdb.h>
+#include <openssl/sha.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -12,7 +13,6 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <openssl/sha.h>
 
 typedef enum {
   EVENT_STARTED,
@@ -41,19 +41,24 @@ typedef struct {
 } tracker_request_t;
 
 typedef struct {
-    uint32_t ip;
-    uint16_t port;
+  char peer_id[20];
+  union {
+    struct sockaddr_storage sas;
+    struct sockaddr sa;
+    struct sockaddr_in sa_in;
+    struct sockaddr_in6 sa_in6;
+  } addr;
 } peer_t;
 
 typedef struct {
-    char *failure_reason;
-    char *warning_message;
-    uint32_t interval;
-    char *tracker_id;
-    uint32_t complete;
-    uint32_t incomplete;
-    size_t num_peers;
-    peer_t *peers;
+  char *failure_reason;
+  char *warning_message;
+  uint32_t interval;
+  char *tracker_id;
+  uint32_t complete;
+  uint32_t incomplete;
+  size_t num_peers;
+  peer_t *peers;
 } tracker_response_t;
 
 int tracker_connect(url_t *url);

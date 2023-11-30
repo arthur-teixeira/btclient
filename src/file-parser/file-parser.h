@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
+#include "../peer-connection/peer-connection.h"
 
 unsigned char *compute_info_hash(const char *buf, size_t start, size_t end);
 #define BENCODE_GET_SHA1(a, b, c) compute_info_hash(a, b, c)
@@ -38,12 +40,18 @@ typedef struct {
   file_info_t *files;
 } info_t;
 
-typedef struct {
+typedef struct metainfo_t {
   char *announce;
   size_t announce_list_size;
   char **announce_list;
   info_t info;
   char info_hash[SHA_DIGEST_LENGTH];
+  size_t max_peers;
+  struct {
+    pthread_mutex_t sh_lock;
+    size_t num_connections;
+    peer_connection_t *peer_connections;
+  } sh;
 } metainfo_t;
 
 #define HT_LOOKUP(ht, key) hash_table_lookup(ht, key, strlen(key))

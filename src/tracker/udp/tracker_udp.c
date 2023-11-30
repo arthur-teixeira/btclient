@@ -171,7 +171,7 @@ reconnect:
   time_t request_time = time(NULL);
 
   assert(dgram_size == sizeof(res));
-  log_printf(LOG_DEBUG, "Connection [%d] to UDP tracker estabilished\n",
+  log_printf(LOG_DEBUG, "Connection [%lu] to UDP tracker estabilished\n",
              res.connection_id);
 
   if (transaction_id != res.transaction_id) {
