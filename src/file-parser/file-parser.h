@@ -1,15 +1,15 @@
 #ifndef FILE_PARSER_H
 #define FILE_PARSER_H
 
+#include "../tracker/tracker_announce.h"
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/sha.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
-#include "../tracker/tracker_announce.h"
 
 unsigned char *compute_info_hash(const char *buf, size_t start, size_t end);
 #define BENCODE_GET_SHA1(a, b, c) compute_info_hash(a, b, c)
@@ -17,6 +17,12 @@ unsigned char *compute_info_hash(const char *buf, size_t start, size_t end);
 #include "../deps/stb_bencode.h"
 
 typedef uint8_t piece_hash[SHA_DIGEST_LENGTH];
+
+typedef enum {
+  PIECE_STATE_NOT_REQUESTED,
+  PIECE_STATE_REQUESTED,
+  PIECE_STATE_HAVE
+} piece_state_t;
 
 typedef enum {
   INFO_SINGLE,
@@ -56,6 +62,7 @@ typedef struct metainfo_t {
     pthread_mutex_t sh_lock;
     size_t num_connections;
     peer_connection_t *peer_connections;
+    char *piece_states;
   } sh;
 } metainfo_t;
 
