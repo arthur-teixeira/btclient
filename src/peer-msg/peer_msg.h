@@ -2,6 +2,7 @@
 #define PEER_MSG_H
 
 #include "../byte-str/byte_str.h"
+#include "../file-parser/file-parser.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -45,5 +46,7 @@ typedef struct {
 
 int peer_send_handshake(int sockfd, char info_hash[20]);
 int peer_recv_handshake(int sockfd, char info_hash[20], char out_peer_id[20]);
+int peer_msg_send(int sockfd, peer_msg_t *msg, const metainfo_t *torrent);
+bool peer_msg_buff_nonempty(int sockfd);
 
 #endif // !PEER_MSG_H

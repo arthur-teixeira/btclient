@@ -89,6 +89,22 @@ bool expect_peek(Parser *p, TokenType expected);
 void parse_error(Parser *p, char *error);
 Lexer new_lexer(char *filename);
 
+#define da_init(da, size)                                                      \
+  do {                                                                         \
+    da->cap = 16;                                                              \
+    da->values = calloc(da->cap, size);                                        \
+    da->len = 0;                                                               \
+  } while (0)
+
+#define da_append(da, value)                                                   \
+  do {                                                                         \
+    if (da->len == da->cap) {                                                  \
+      da->cap *= 2;                                                            \
+      da->values = realloc(da->values, da->cap * sizeof(da->values[0]));       \
+    }                                                                          \
+    da->values[da->len++] = value;                                             \
+  } while (0)
+
 #endif // PARSER_H
 
 #ifdef BENCODE_IMPLEMENTATION
@@ -105,22 +121,6 @@ Lexer new_lexer(char *filename);
 
 #define HASH_TABLE_IMPLEMENTATION
 #include "stb_hashtable.h"
-
-#define da_init(da, size)                                                      \
-  do {                                                                         \
-    da->cap = 16;                                                              \
-    da->values = calloc(da->cap, size);                                        \
-    da->len = 0;                                                               \
-  } while (0);
-
-#define da_append(da, value)                                                   \
-  do {                                                                         \
-    if (da->len == da->cap) {                                                  \
-      da->cap *= 2;                                                            \
-      da->values = realloc(da->values, da->cap * sizeof(da->values[0]));       \
-    }                                                                          \
-    da->values[da->len++] = value;                                             \
-  } while (0);
 
 BencodeType parse_integer(Parser *p) {
   BencodeType b;

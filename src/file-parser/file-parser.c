@@ -128,5 +128,7 @@ metainfo_t parse_file(char *filename) {
 
   metainfo.info = parse_info(&info->asDict);
   memcpy(metainfo.info_hash, info->sha1_digest, SHA_DIGEST_LENGTH);
+
+  metainfo.files = calloc(metainfo.info.files_count, sizeof(filemem_t));
   return metainfo;
 }

@@ -6,6 +6,9 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#define KB (1 << 10)
+#define PEER_REQUEST_SIZE (16 * KB)
+
 typedef struct {
   metainfo_t *torrent;
   peer_t peer;

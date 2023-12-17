@@ -1,6 +1,7 @@
 #ifndef FILE_PARSER_H
 #define FILE_PARSER_H
 
+#include "../dl-file/dl_file.h"
 #include "../tracker/tracker_announce.h"
 #include <openssl/err.h>
 #include <openssl/evp.h>
@@ -64,6 +65,7 @@ typedef struct metainfo_t {
     peer_connection_t *peer_connections;
     char *piece_states;
   } sh;
+  filemem_t *files;
 } metainfo_t;
 
 #define HT_LOOKUP(ht, key) hash_table_lookup(ht, key, strlen(key))

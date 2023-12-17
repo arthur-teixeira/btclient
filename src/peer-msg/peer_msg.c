@@ -3,11 +3,14 @@
 #include "../file-parser/file-parser.h"
 #include "../log/log.h"
 #include "../peer-id/peer-id.h"
+#include "../piece-request/piece_request.h"
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
+#include "../peer-connection/peer-connection.h"
 
 int send_buff(int sockfd, char *buff, size_t bufflen) {
   size_t total_sent = 0;
@@ -113,9 +116,6 @@ int peer_recv_handshake(int sockfd, char info_hash[20], char out_peer_id[20]) {
   return 0;
 }
 
-#define KB (1 << 10)
-#define PEER_REQUEST_SIZE (16 * KB)
-
 uint32_t msgbuf_len(msg_type_t type, const metainfo_t *torrent) {
   switch (type) {
   case MSG_KEEPALIVE:
@@ -132,12 +132,6 @@ uint32_t msgbuf_len(msg_type_t type, const metainfo_t *torrent) {
   default:
     return 1;
   }
-}
-
-int peer_msg_send_piece(int sockfd, piece_msg_t *piece,
-                        const metainfo_t *torrent) {
-    piece
-
 }
 
 int peer_msg_send(int sockfd, peer_msg_t *msg, const metainfo_t *torrent) {
@@ -201,4 +195,105 @@ int peer_msg_send(int sockfd, peer_msg_t *msg, const metainfo_t *torrent) {
   default:
     return -1;
   }
+}
+
+static inline bool valid_len(msg_type_t type, const metainfo_t *torrent,
+                             uint32_t len) {
+  if (type == MSG_PIECE) {
+    return (len >= (1 + 2 * sizeof(uint32_t) + 1)) &&
+           (len <= (1 + 2 * sizeof(uint32_t) + PEER_REQUEST_SIZE));
+  }
+
+  return len == msgbuf_len(type, torrent);
+}
+
+int peer_msg_recv_piece(int sockfd, peer_msg_t *out, const metainfo_t *torrent,
+                        uint32_t len) {
+  uint32_t u32, left = len;
+
+  if (peer_recv(sockfd, (char *)&u32, sizeof(u32)) < 0) {
+    return -1;
+  }
+
+  out->payload.piece.index = ntohl(u32);
+  left -= sizeof(uint32_t);
+
+  if (peer_recv(sockfd, (char *)&u32, sizeof(u32)) < 0) {
+    return -1;
+  }
+
+  out->payload.piece.begin = ntohl(u32);
+  left -= sizeof(uint32_t);
+
+  out->payload.piece.blocklen = left;
+  piece_request_t *pr = piece_request_create(torrent, out->payload.piece.index);
+  if (!pr) {
+    return -1;
+  }
+
+  block_request_t *br = piece_request_block_at(pr, out->payload.piece.begin);
+  if (!br) {
+    log_printf(LOG_ERROR, "Could not create block_request\n");
+    return -1;
+  }
+}
+
+int peer_msg_recv(int sockfd, peer_msg_t *out, const metainfo_t *torrent) {
+  uint32_t len;
+  if (peer_recv(sockfd, (char *)&len, sizeof(len)) < 0) {
+    return -1;
+  }
+
+  len = ntohl(len);
+
+  log_printf(LOG_INFO, "Receiving message of length %u\n", len);
+
+  if (len == 0) {
+    out->type = MSG_KEEPALIVE;
+    return 0;
+  }
+
+  uint8_t type;
+  if (peer_recv(sockfd, (char *)&type, 1) < 0) {
+    return -1;
+  }
+
+  if (type >= MSG_MAX) {
+    return -1;
+  }
+
+  if (!valid_len(type, torrent, len)) {
+    return -1;
+  }
+
+  out->type = type;
+  uint32_t left = len - 1;
+
+  switch (type) {
+  case MSG_CHOKE:
+  case MSG_UNCHOKE:
+  case MSG_INTERESTED:
+  case MSG_NOT_INTERESTED:
+    assert(left == 0);
+    break;
+  case MSG_PIECE:
+    assert(left > 0);
+  }
+}
+
+bool peer_msg_buff_nonempty(int sockfd) {
+  uint32_t len;
+  int n = recv(sockfd, (char *)&len, sizeof(uint32_t), MSG_PEEK | MSG_DONTWAIT);
+  if (n < sizeof(uint32_t)) {
+    return false;
+  }
+
+  len = ntohl(len);
+
+  int bytes_available;
+  if (ioctl(sockfd, FIONREAD, &bytes_available)) {
+    return false;
+  }
+
+  return (unsigned)bytes_available >= len + sizeof(uint16_t);
 }

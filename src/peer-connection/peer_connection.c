@@ -4,7 +4,6 @@
 #include "../queue/queue.h"
 #include "peer-connection.h"
 #include <arpa/inet.h>
-#include <asm-generic/errno.h>
 #include <fcntl.h>
 #include <mqueue.h>
 #include <netinet/in.h>
@@ -14,6 +13,9 @@
 #include <stdlib.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <unistd.h>
+
+#define PEER_TIMEOUT_SEC 120
 
 mqd_t peer_queue_open(int flags);
 void queue_cleanup(void *arg);
@@ -181,6 +183,49 @@ int peer_connect(peer_arg_t *arg) {
   return sockfd;
 }
 
+void unchoke(int sockfd, conn_state_t *state, const metainfo_t *torrent) {
+  peer_msg_t unchoke_msg = {
+      .type = MSG_UNCHOKE,
+  };
+
+  if (peer_msg_send(sockfd, &unchoke_msg, torrent) < 0) {
+    return;
+  }
+
+  state->remote.choked = false;
+  log_printf(LOG_DEBUG, "Unchoked peer\n");
+}
+
+void service_have_events(int sockfd, mqd_t queue, const metainfo_t *torrent,
+                         uint8_t *havebf) {
+  peer_msg_t msg = {
+      .type = MSG_HAVE,
+  };
+
+  uint32_t have;
+  int ret;
+  while ((ret = mq_receive(queue, (char *)&have, sizeof(uint32_t), 0)) ==
+         sizeof(uint32_t)) {
+    msg.payload.have = have;
+    BITFIELD_SET(have, havebf);
+    if (peer_msg_send(sockfd, &msg, torrent) < 0) {
+      break;
+    }
+    log_printf(LOG_INFO, "Event serviced: have (%u) sent to peer\n", have);
+  }
+}
+
+int process_queued_messages(int sockfd, metainfo_t *torrent,
+                            conn_state_t *state, time_t *last) {
+  while (peer_msg_buff_nonempty(sockfd)) {
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+    pthread_testcancel();
+    pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+
+    peer_msg_t msg;
+  }
+}
+
 void *peer_connection(void *arg) {
   pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
   pthread_cleanup_push(peer_connection_cleanup, arg);
@@ -198,6 +243,9 @@ void *peer_connection(void *arg) {
     } else {
       sockfd = parg->sockfd;
     }
+
+    char ipstr[INET_ADDRSTRLEN];
+    print_ip(&parg->peer, ipstr, INET_ADDRSTRLEN);
 
     char out_peer_id[20];
     if (handshake(sockfd, parg->torrent->info_hash, out_peer_id) < 0) {
@@ -224,14 +272,35 @@ void *peer_connection(void *arg) {
             .payload.bitfield = byte_str_new(BITFIELD_NUM_BYTES(state->bitlen),
                                              state->local_have),
         };
+        if (peer_msg_send(sockfd, &bitmsg, parg->torrent) < 0) {
+          byte_str_free(bitmsg.payload.bitfield);
+          goto abort_conn;
+        }
+        byte_str_free(bitmsg.payload.bitfield);
 
+        unchoke(sockfd, state, parg->torrent);
+        time_t last_msg_time = time(NULL);
+        while (true) {
+          time_t curr = time(NULL);
+          if (curr - last_msg_time > PEER_TIMEOUT_SEC) {
+            log_printf(LOG_WARNING, "Connection with peer [%s] timed out\n",
+                       ipstr);
+            goto abort_conn;
+          }
+
+          pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+          usleep(250000);
+          pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+
+          service_have_events(sockfd, queue, parg->torrent, state->local_have);
+        }
+
+      abort_conn:;
       }
       pthread_cleanup_pop(1);
-
     fail_init_state:;
     };
     pthread_cleanup_pop(1);
-
   fail_init:;
   };
   pthread_cleanup_pop(1);
