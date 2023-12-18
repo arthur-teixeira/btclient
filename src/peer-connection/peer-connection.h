@@ -1,6 +1,7 @@
 #ifndef PEER_CONNECTION_H
 #define PEER_CONNECTION_H
 #include "../file-parser/file-parser.h"
+#include "../piece-request/piece_request.h"
 #include "../queue/queue.h"
 #include "../tracker/peer_parser.h"
 #include <pthread.h>
@@ -21,6 +22,12 @@ typedef struct {
 } peer_state_t;
 
 typedef struct {
+  size_t len;
+  size_t cap;
+  piece_request_t *values;
+} piece_requests_t;
+
+typedef struct {
   peer_state_t local;
   peer_state_t remote;
   uint8_t *peer_have;
@@ -29,7 +36,9 @@ typedef struct {
   size_t bitlen;
   uint32_t blocks_sent;
   uint32_t block_recvd;
+  piece_requests_t *local_requests;
   queue_t *peer_requests;
+
 } conn_state_t;
 
 int peer_connection_create(pthread_t *thread, peer_arg_t *arg);

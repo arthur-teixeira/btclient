@@ -2,15 +2,14 @@
 #include "../bitfield/bitfield.h"
 #include "../file-parser/file-parser.h"
 #include "../log/log.h"
+#include "../peer-connection/peer-connection.h"
 #include "../peer-id/peer-id.h"
 #include "../piece-request/piece_request.h"
 #include <assert.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
-#include "../peer-connection/peer-connection.h"
 
 int send_buff(int sockfd, char *buff, size_t bufflen) {
   size_t total_sent = 0;
@@ -233,9 +232,21 @@ int peer_msg_recv_piece(int sockfd, peer_msg_t *out, const metainfo_t *torrent,
 
   block_request_t *br = piece_request_block_at(pr, out->payload.piece.begin);
   if (!br) {
-    log_printf(LOG_ERROR, "Could not create block_request\n");
+    log_printf(LOG_ERROR, "Could not find block_request\n");
     return -1;
   }
+
+  for (size_t i = 0; i < br->filemems->len; i++) {
+    filemem_t mem = br->filemems->values[i];
+    log_printf(LOG_DEBUG, "Writing %zu bytes to %p\n", mem.size, mem.mem);
+    if (peer_recv(sockfd, mem.mem, mem.size) < 0) {
+      piece_request_free(pr);
+      return -1;
+    }
+  }
+
+  piece_request_free(pr);
+  return 0;
 }
 
 int peer_msg_recv(int sockfd, peer_msg_t *out, const metainfo_t *torrent) {
@@ -278,7 +289,67 @@ int peer_msg_recv(int sockfd, peer_msg_t *out, const metainfo_t *torrent) {
     break;
   case MSG_PIECE:
     assert(left > 0);
+    if (peer_msg_recv_piece(sockfd, out, torrent, left) < 0) {
+      return -1;
+    }
+    break;
+  case MSG_BITFIELD: {
+    char buf[left];
+    if (peer_recv(sockfd, buf, left) < 0) {
+      return -1;
+    }
+
+    out->payload.bitfield = byte_str_new(left, (uint8_t *)"");
+    if (!out->payload.bitfield) {
+      return -1;
+    }
+
+    memcpy(out->payload.bitfield->str, buf, left);
+    break;
   }
+  case MSG_REQUEST: {
+    char buf[left];
+    if (peer_recv(sockfd, buf, left) < 0) {
+      return -1;
+    }
+    assert(left == 3 * sizeof(uint32_t));
+    uint32_t u32;
+    memcpy(&u32, buf, sizeof(uint32_t));
+    out->payload.request.index = ntohl(u32);
+
+    memcpy(&u32, buf + sizeof(uint32_t), sizeof(uint32_t));
+    out->payload.request.begin = ntohl(u32);
+
+    memcpy(&u32, buf + 2 * sizeof(uint32_t), sizeof(uint32_t));
+    out->payload.request.length = ntohl(u32);
+    break;
+  }
+  case MSG_HAVE: {
+    uint32_t u32;
+    assert(left == sizeof(uint32_t));
+    if (peer_recv(sockfd, (char *)&u32, left) < 0) {
+      return -1;
+    }
+    out->payload.have = ntohl(u32);
+    break;
+  }
+  case MSG_PORT: {
+    uint32_t u32;
+    assert(left == sizeof(uint32_t));
+    if (peer_recv(sockfd, (char *)&u32, left) < 0) {
+      return -1;
+    }
+    out->payload.listen_port = ntohl(u32);
+    break;
+  }
+  default:
+    return -1;
+  }
+
+  log_printf(LOG_DEBUG, "Successfully received message from peer, Type %hhu\n",
+             type);
+
+  return 0;
 }
 
 bool peer_msg_buff_nonempty(int sockfd) {

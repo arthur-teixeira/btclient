@@ -3,8 +3,8 @@
 #include "../dl-file/dl_file.h"
 #include "../peer-connection/peer-connection.h"
 
-void skip_until_index(const dl_file_t **file_iter, off_t *offset, uint32_t index,
-                      const metainfo_t *torrent) {
+void skip_until_index(const dl_file_t **file_iter, off_t *offset,
+                      uint32_t index, const metainfo_t *torrent) {
   size_t skip = torrent->info.piece_length * index;
 
   while (skip > 0) {
@@ -84,4 +84,16 @@ piece_request_t *piece_request_create(const metainfo_t *torrent,
   size_t left = torrent->info.piece_length;
 
   return ret;
+}
+
+block_request_t *piece_request_block_at(piece_request_t *request,
+                                        off_t offset) {
+  const uint8_t *entry;
+  for (size_t i = 0; i < request->block_requests_count; i++) {
+    if (request->block_requests[i].begin == offset) {
+      return &request->block_requests[i];
+    }
+  }
+
+  return NULL;
 }

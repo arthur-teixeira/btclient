@@ -1,6 +1,7 @@
 #include "../bitfield/bitfield.h"
 #include "../byte-str/byte_str.h"
 #include "../peer-msg/peer_msg.h"
+#include "../sha1/sha1.h"
 #include "../queue/queue.h"
 #include "peer-connection.h"
 #include <arpa/inet.h>
@@ -11,6 +12,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -64,6 +66,11 @@ conn_state_t *conn_state_init(metainfo_t *torrent) {
   state->peer_requests = queue_init(sizeof(request_msg_t), 16);
   if (!state->peer_requests) {
     goto fail_peer_requests;
+  }
+
+  da_init(state->local_requests, sizeof(piece_request_t));
+  if (!state->local_requests->values) {
+    goto fail_local_requests;
   }
 
   pthread_mutex_lock(&torrent->sh.sh_lock);
@@ -215,6 +222,127 @@ void service_have_events(int sockfd, mqd_t queue, const metainfo_t *torrent,
   }
 }
 
+void show_interested(int sockfd, conn_state_t *state,
+                     const metainfo_t *torrent) {
+  peer_msg_t interested_msg;
+  interested_msg.type = MSG_INTERESTED;
+
+  if (peer_msg_send(sockfd, &interested_msg, torrent) < 0) {
+    return;
+  }
+
+  state->local.interested = true;
+  log_printf(LOG_DEBUG, "Showed interested to the peer\n");
+}
+
+void process_piece_msg(int sockfd, conn_state_t *state, piece_msg_t *msg,
+                       metainfo_t *torrent) {
+
+  for (size_t i = 0; i < state->local_requests->len; i++) {
+    piece_request_t *curr = &state->local_requests->values[i];
+
+    if (curr->piece_index == msg->index) {
+      for (size_t j = 0; j < curr->block_requests_count; j++) {
+        block_request_t *br = &curr->block_requests[j];
+
+        if (br->len == msg->blocklen && br->begin == msg->begin) {
+          br->completed = true;
+          curr->blocks_left--;
+          break;
+        }
+      }
+
+      if (curr->blocks_left == 0) {
+        bool valid = torrent_sha1_verify(torrent, curr->piece_index);
+
+        if (!valid) {
+          log_printf(LOG_WARNING,
+                     "Piece downloaded does not have expected SHA1 hash\n");
+
+          pthread_mutex_lock(&torrent->sh.sh_lock);
+          torrent->sh.piece_states[curr->piece_index] =
+              PIECE_STATE_NOT_REQUESTED;
+          pthread_mutex_unlock(&torrent->sh.sh_lock);
+        } else {
+          log_printf(LOG_INFO, "Successfully downloaded a piece %u\n",
+                     curr->piece_index);
+          handle_piece_dl_completion(sockfd, torrent, curr->piece_index);
+        }
+
+        piece_request_free(curr); // TODO: Might segfault
+      }
+    }
+  }
+}
+
+void process_msg(int sockfd, peer_msg_t *msg, conn_state_t *state,
+                 metainfo_t *torrent) {
+  switch (msg->type) {
+  case MSG_KEEPALIVE:
+    break;
+  case MSG_CHOKE:
+    state->local.choked = true;
+    break;
+  case MSG_UNCHOKE:
+    log_printf(LOG_DEBUG, "Unchoked\n");
+    state->local.choked = false;
+  case MSG_INTERESTED:
+    state->remote.interested = true;
+    log_printf(LOG_DEBUG, "Peer interested in us\n");
+    break;
+  case MSG_NOT_INTERESTED:
+    state->remote.interested = false;
+    break;
+  case MSG_HAVE:
+    if (!state->local.interested &&
+        BITFIELD_ISSET(msg->payload.have, state->local_have)) {
+      show_interested(sockfd, state, torrent);
+    }
+    BITFIELD_SET(msg->payload.have, state->peer_have);
+    break;
+  case MSG_BITFIELD:
+    assert(msg->payload.bitfield->size == BITFIELD_NUM_BYTES(state->bitlen));
+    memcpy(state->peer_have, msg->payload.bitfield->str,
+           BITFIELD_NUM_BYTES(state->bitlen));
+
+    pthread_mutex_lock(&torrent->sh.sh_lock);
+    bool interested = false;
+    for (int i = 0; i < torrent->info.num_pieces; i++) {
+      if (torrent->sh.piece_states[i] != PIECE_STATE_HAVE &&
+          BITFIELD_ISSET(i, state->peer_have)) {
+        interested = true;
+        break;
+      }
+    }
+    pthread_mutex_unlock(&torrent->sh.sh_lock);
+    if (interested) {
+      show_interested(sockfd, state, torrent);
+    }
+    break;
+
+  case MSG_REQUEST:
+    log_printf(LOG_DEBUG,
+               "pushing request:\n"
+               "    index: %u\n"
+               "    length: %u\n"
+               "    begin: %u\n",
+               msg->payload.request.index, msg->payload.request.length,
+               msg->payload.request.begin);
+
+    enqueue(state->peer_requests, &msg->payload.request);
+    break;
+  case MSG_PIECE:
+    process_piece_msg(sockfd, state, &msg->payload.piece, torrent);
+    state->block_recvd++;
+    break;
+  case MSG_CANCEL:
+  case MSG_PORT:
+    break;
+  default:
+    break;
+  }
+}
+
 int process_queued_messages(int sockfd, metainfo_t *torrent,
                             conn_state_t *state, time_t *last) {
   while (peer_msg_buff_nonempty(sockfd)) {
@@ -223,6 +351,15 @@ int process_queued_messages(int sockfd, metainfo_t *torrent,
     pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
 
     peer_msg_t msg;
+    if (peer_msg_recv(sockfd, &msg, torrent) < 0) {
+      return -1;
+    }
+    *last = time(NULL);
+
+    process_msg(sockfd, &msg, state, torrent);
+    if (msg.type == MSG_BITFIELD) {
+      byte_str_free(msg.payload.bitfield);
+    }
   }
 }
 
