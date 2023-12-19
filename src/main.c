@@ -25,7 +25,7 @@ int create_peer_connection(peer_t *peer, metainfo_t *torrent) {
   arg->sockfd = -1;
 
   if (peer_connection_create(&conn.thread, arg) < 0) {
-    log_printf(LOG_ERROR, "Could not create peer thread\n");
+    log_printf(LOG_ERROR, "Could not create peer conn thread\n");
     free(arg);
 
     return -1;
