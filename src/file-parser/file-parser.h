@@ -78,7 +78,7 @@ typedef struct metainfo_t {
     size_t pieces_left;
     bool completed;
   } sh;
-  dl_file_t *files;
+  dl_file_t **files;
 } metainfo_t;
 
 #define HT_LOOKUP(ht, key) hash_table_lookup(ht, key, strlen(key))

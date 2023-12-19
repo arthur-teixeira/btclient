@@ -292,7 +292,7 @@ void torrent_complete(metainfo_t *torrent) {
   pthread_mutex_unlock(&torrent->sh.sh_lock);
 
   for (size_t i = 0; i < torrent->info.files_count; i++) {
-    dl_file_complete(&torrent->files[i]);
+    dl_file_complete(torrent->files[i]);
   }
   log_printf(LOG_INFO, "Torrent completed\n");
 }
@@ -359,6 +359,7 @@ void show_not_interested(int sockfd, conn_state_t *state,
 
 void process_piece_msg(int sockfd, conn_state_t *state, piece_msg_t *msg,
                        metainfo_t *torrent) {
+  log_printf(LOG_INFO, "Processing piece\n");
 
   for (size_t i = 0; i < state->local_requests->len; i++) {
     piece_request_t *curr = &state->local_requests->values[i];
@@ -393,8 +394,6 @@ void process_piece_msg(int sockfd, conn_state_t *state, piece_msg_t *msg,
       }
     }
   }
-
-  free(state->local_requests->values);
 }
 
 void process_msg(int sockfd, peer_msg_t *msg, conn_state_t *state,

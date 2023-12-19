@@ -19,10 +19,10 @@ bool torrent_sha1_verify(metainfo_t *torrent, size_t piece_index) {
   const EVP_MD *hashptr = EVP_get_digestbyname("SHA1");
   EVP_DigestInit(ctx, hashptr);
 
-  for (int i = 0; i < pr->block_requests->len; i++) {
+  for (size_t i = 0; i < pr->block_requests->len; i++) {
     block_request_t *br = &pr->block_requests->values[i];
 
-    for (int j = 0; j < br->filemems->len; j++) {
+    for (size_t j = 0; j < br->filemems->len; j++) {
       filemem_t mem = br->filemems->values[j];
       EVP_DigestUpdate(ctx, mem.mem, mem.size);
     }

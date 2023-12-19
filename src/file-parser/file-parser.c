@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #define BENCODE_IMPLEMENTATION
 #include "../deps/stb_bencode.h"
@@ -142,6 +143,27 @@ metainfo_t parse_file(char *filename) {
   metainfo.sh.completed = false;
   metainfo.sh.peer_connections = malloc(sizeof(peer_connections_t));
   da_init(metainfo.sh.peer_connections, sizeof(peer_connection_t));
+
+  metainfo.files = calloc(metainfo.info.files_count, sizeof(dl_file_t *));
+  for (size_t i = 0; i < metainfo.info.files_count; i++) {
+    file_info_t *cur_file = &metainfo.info.files[i];
+    char path[512];
+    strcpy(path, "./");
+    strcat(path, metainfo.info.name);
+    strcat(path, "/");
+    mkdir(path, 0777);
+
+
+    for (size_t j = 0; j < cur_file->path_size; j++) {
+      strcat(path, cur_file->path[j]);
+      if (j < cur_file->path_size - 1) {
+        mkdir(path, 0777);
+        strcat(path, "/");
+      }
+    }
+    log_printf(LOG_INFO, "Target file: %s\n", path);
+    metainfo.files[i] = dl_file_create_and_open(cur_file->length, path);
+  }
 
   return metainfo;
 }

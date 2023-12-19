@@ -6,7 +6,7 @@
 
 typedef struct queue {
   size_t entry_size;
-  int capacity;
+  size_t capacity;
   size_t size;
   char *head;
   char *tail;

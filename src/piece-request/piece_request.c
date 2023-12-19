@@ -3,14 +3,13 @@
 #include "../dl-file/dl_file.h"
 #include "../peer-connection/peer-connection.h"
 
-void skip_until_index(const dl_file_t **file_iter, size_t *cur_file_index,
-                      off_t *offset, uint32_t index,
-                      const metainfo_t *torrent) {
+void skip_until_index(dl_file_t **files, size_t *cur_file_index, off_t *offset,
+                      uint32_t index, const metainfo_t *torrent) {
   size_t skip = torrent->info.piece_length * index;
 
   while (skip > 0) {
     filemem_t mem;
-    dl_file_getfilemem(*file_iter, &mem);
+    dl_file_getfilemem(files[*cur_file_index], &mem);
 
     if (mem.size > skip) {
       *offset = skip;
@@ -18,15 +17,13 @@ void skip_until_index(const dl_file_t **file_iter, size_t *cur_file_index,
     }
 
     skip -= mem.size;
-    *file_iter = *file_iter + 1; // TODO: check pointer arithmetic correctness
     *cur_file_index = *cur_file_index + 1;
   }
 }
 
-int next_block_request(block_request_t *out, const dl_file_t *dl_file,
-                       off_t *offset, size_t *left, size_t piecelen,
-                       size_t *cur_file_index, size_t file_count) {
-  if (!dl_file || *left == 0) {
+int next_block_request(block_request_t *out, dl_file_t **files, off_t *offset,
+                       size_t *left, size_t piecelen, size_t *cur_file_index) {
+  if (!files[*cur_file_index] || *left == 0) {
     return -1;
   }
 
@@ -38,16 +35,16 @@ int next_block_request(block_request_t *out, const dl_file_t *dl_file,
     return -1;
   }
   da_init(out->filemems, sizeof(filemem_t));
-  if (!out->filemems) {
+  if (!out->filemems->values) {
     return -1;
   }
 
   uint32_t curr_size = 0;
 
   do {
-    assert(dl_file);
+    assert(files[*cur_file_index]);
     filemem_t mem;
-    dl_file_getfilemem(dl_file, &mem);
+    dl_file_getfilemem(files[*cur_file_index], &mem);
     mem.mem = ((char *)mem.mem + *offset);
     mem.size -= *offset;
 
@@ -56,14 +53,13 @@ int next_block_request(block_request_t *out, const dl_file_t *dl_file,
       *offset += mem.size;
     } else {
       *cur_file_index += 1;
-      dl_file += 1; // TODO: check pointer arithmetic correctness
       *offset = 0;
     }
 
     *left -= mem.size;
     da_append(out->filemems, mem);
     curr_size += mem.size;
-  } while (curr_size < PEER_REQUEST_SIZE && *cur_file_index < file_count);
+  } while (curr_size < PEER_REQUEST_SIZE && files[*cur_file_index]);
 
   out->len = curr_size;
   return 0;
@@ -91,15 +87,13 @@ piece_request_t *piece_request_create(const metainfo_t *torrent,
   size_t left = torrent->info.piece_length;
   off_t offset = 0;
 
-  const dl_file_t *iter = torrent->files;
   size_t cur_file_index = 0;
 
-  skip_until_index(&iter, &cur_file_index, &offset, index, torrent);
+  skip_until_index(torrent->files, &cur_file_index, &offset, index, torrent);
 
   block_request_t block;
-  while (next_block_request(&block, iter, &offset, &left,
-                            torrent->info.piece_length, &cur_file_index,
-                            torrent->info.files_count) == 0) {
+  while (next_block_request(&block, torrent->files, &offset, &left,
+                            torrent->info.piece_length, &cur_file_index) == 0) {
     da_append(ret->block_requests, block);
   }
 
@@ -109,7 +103,6 @@ piece_request_t *piece_request_create(const metainfo_t *torrent,
 
 block_request_t *piece_request_block_at(piece_request_t *request,
                                         off_t offset) {
-  const uint8_t *entry;
   for (size_t i = 0; i < request->block_requests->len; i++) {
     if (request->block_requests->values[i].begin == offset) {
       return &request->block_requests->values[i];

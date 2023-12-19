@@ -15,7 +15,7 @@ dl_file_t *dl_file_create_and_open(size_t size, const char *path) {
   strcpy(newpath, path);
   strcat(newpath, ".incomplete");
 
-  log_printf(LOG_DEBUG, "CREATING FILE AT %s\n", path);
+  log_printf(LOG_DEBUG, "OPENING FILE AT %s\n", path);
   int fd = open(path, O_CREAT | O_RDWR, 0777);
   if (fd < 0) {
     goto fail_open;
@@ -27,7 +27,7 @@ dl_file_t *dl_file_create_and_open(size_t size, const char *path) {
 
   struct stat stats;
   fstat(fd, &stats);
-  assert(stats.st_size == size);
+  assert((size_t)stats.st_size == size);
 
   uint8_t *mem =
       mmap(NULL, stats.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
@@ -59,7 +59,7 @@ fail_mmap:
 fail_truncate:
   close(fd);
 fail_open:
-  log_printf(LOG_ERROR, "Unable to (create and) open file at $s\n", path);
+  log_printf(LOG_ERROR, "Unable to (create and) open file at %s\n", path);
   return NULL;
 }
 
