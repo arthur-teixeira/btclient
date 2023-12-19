@@ -1,13 +1,13 @@
 #include "log.h"
 
-// #include "pthread.h"
 #include "stdarg.h"
 #include <stdio.h>
 #include <sys/syscall.h>
 #include <time.h>
 #include <unistd.h>
+#include <pthread.h>
 
-// pthread_mutex_t log_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t log_lock = PTHREAD_MUTEX_INITIALIZER;
 log_level_t level = DEFAULT_LOG_LVL;
 FILE *log_file = NULL;
 
@@ -52,9 +52,9 @@ void log_printf(log_level_t lvl, const char *fmt, ...) {
     return;
   }
 
-  // pthread_mutex_lock(&log_lock);
+  pthread_mutex_lock(&log_lock);
 
-  fprintf(log_file, "[%s] - [%.*s] [%05ld] ", print_level(lvl), 8, timestr,
+  fprintf(log_file, "[%s] - [%.*s] [%05ld] ", print_level(lvl) + 4, 8, timestr,
           tid);
   switch (lvl) {
   case LOG_WARNING:
@@ -71,7 +71,7 @@ void log_printf(log_level_t lvl, const char *fmt, ...) {
   vfprintf(log_file, fmt, args);
   va_end(args);
 
-  // pthread_mutex_unlock(&log_lock);
+  pthread_mutex_unlock(&log_lock);
 
   fflush(log_file);
 }

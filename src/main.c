@@ -32,12 +32,12 @@ int create_peer_connection(peer_t *peer, metainfo_t *torrent) {
   }
 
   pthread_mutex_lock(&torrent->sh.sh_lock);
-  if (torrent->max_peers == torrent->sh.num_connections) {
+  if (torrent->max_peers == torrent->sh.peer_connections->len) {
     pthread_mutex_unlock(&torrent->sh.sh_lock);
     return 0;
   }
 
-  torrent->sh.peer_connections[torrent->sh.num_connections++] = conn;
+  da_append(torrent->sh.peer_connections, conn);
 
   pthread_mutex_unlock(&torrent->sh.sh_lock);
 
@@ -51,10 +51,11 @@ int main(int argc, char **argv) {
   }
   srand(time(NULL));
   create_peer_id();
-  log_set_logfile(stderr);
+  log_set_logfile(stdout);
   log_set_lvl(LOG_DEBUG);
 
   metainfo_t file = parse_file(argv[1]);
+  file.max_peers = 50;
 
   url_t announce_url = file.announce ? url_from_string(file.announce)
                                      : url_from_string(file.announce_list[0]);

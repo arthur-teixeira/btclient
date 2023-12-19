@@ -26,6 +26,11 @@ typedef enum {
 } piece_state_t;
 
 typedef enum {
+    TORRENT_STATE_LEECHING,
+    TORRENT_STATE_SEEDING
+} torrent_state_t;
+
+typedef enum {
   INFO_SINGLE,
   INFO_MULTI,
 } info_mode_t;
@@ -52,6 +57,12 @@ typedef struct {
   pthread_t thread;
 } peer_connection_t;
 
+typedef struct {
+    size_t len;
+    size_t cap;
+    peer_connection_t *values;
+} peer_connections_t;
+
 typedef struct metainfo_t {
   char *announce;
   size_t announce_list_size;
@@ -60,12 +71,14 @@ typedef struct metainfo_t {
   char info_hash[SHA_DIGEST_LENGTH];
   size_t max_peers;
   struct {
+    torrent_state_t state;
     pthread_mutex_t sh_lock;
-    size_t num_connections;
-    peer_connection_t *peer_connections;
+    peer_connections_t *peer_connections;
     char *piece_states;
+    size_t pieces_left;
+    bool completed;
   } sh;
-  filemem_t *files;
+  dl_file_t *files;
 } metainfo_t;
 
 #define HT_LOOKUP(ht, key) hash_table_lookup(ht, key, strlen(key))

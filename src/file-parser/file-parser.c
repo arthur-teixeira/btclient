@@ -1,5 +1,6 @@
 #include "file-parser.h"
 #include <openssl/sha.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -130,5 +131,17 @@ metainfo_t parse_file(char *filename) {
   memcpy(metainfo.info_hash, info->sha1_digest, SHA_DIGEST_LENGTH);
 
   metainfo.files = calloc(metainfo.info.files_count, sizeof(filemem_t));
+
+  pthread_mutex_init(&metainfo.sh.sh_lock, NULL);
+  metainfo.max_peers = 50;
+  metainfo.sh.piece_states = malloc(metainfo.info.num_pieces);
+  memset(metainfo.sh.piece_states, PIECE_STATE_NOT_REQUESTED,
+         metainfo.info.num_pieces);
+  metainfo.sh.pieces_left = metainfo.info.num_pieces;
+  metainfo.sh.state = TORRENT_STATE_LEECHING;
+  metainfo.sh.completed = false;
+  metainfo.sh.peer_connections = malloc(sizeof(peer_connections_t));
+  da_init(metainfo.sh.peer_connections, sizeof(peer_connection_t));
+
   return metainfo;
 }

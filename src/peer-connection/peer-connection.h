@@ -42,5 +42,6 @@ typedef struct {
 } conn_state_t;
 
 int peer_connection_create(pthread_t *thread, peer_arg_t *arg);
+void peer_connection_queue_name(pthread_t thread, char *out, size_t len);
 
 #endif // !PEER_CONNECTION_H

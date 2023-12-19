@@ -3,7 +3,7 @@ CFLAGS = -Wall -Wextra -ggdb
 SRCDIR = ./src
 BINDIR = ./bin
 SRCEXT = c
-LIBS = -lssl -lcrypto -lunity -lcurl
+LIBS = -lssl -lcrypto -lunity -lcurl -lpthread -lrt
 
 SRCS := $(shell find ./src ! -name '*_test.c' -type f -name '*.c')
 

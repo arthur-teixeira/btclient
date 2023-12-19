@@ -21,9 +21,14 @@ typedef struct {
 } block_request_t;
 
 typedef struct {
+    size_t cap;
+    size_t len;
+    block_request_t *values;
+} block_requests_t;
+
+typedef struct {
   uint32_t piece_index;
-  size_t block_requests_count;
-  block_request_t *block_requests; // TODO: 
+  block_requests_t *block_requests;
   uint32_t blocks_left;
 } piece_request_t;
 

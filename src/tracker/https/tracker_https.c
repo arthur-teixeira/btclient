@@ -39,7 +39,7 @@ tracker_response_t *https_announce(url_t *url, tracker_request_t *req) {
   curl_easy_setopt(curl, CURLOPT_STDERR, log_file);
   curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
   curl_easy_setopt(curl, CURLOPT_URL, req_buf);
-  curl_easy_setopt(curl, CURLOPT_CA_CACHE_TIMEOUT, 604800L);
+  curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 604800L);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 

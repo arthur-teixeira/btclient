@@ -208,6 +208,7 @@ static inline bool valid_len(msg_type_t type, const metainfo_t *torrent,
 
 int peer_msg_recv_piece(int sockfd, peer_msg_t *out, const metainfo_t *torrent,
                         uint32_t len) {
+  log_printf(LOG_INFO, "Receiving piece\n");
   uint32_t u32, left = len;
 
   if (peer_recv(sockfd, (char *)&u32, sizeof(u32)) < 0) {
@@ -355,7 +356,7 @@ int peer_msg_recv(int sockfd, peer_msg_t *out, const metainfo_t *torrent) {
 bool peer_msg_buff_nonempty(int sockfd) {
   uint32_t len;
   int n = recv(sockfd, (char *)&len, sizeof(uint32_t), MSG_PEEK | MSG_DONTWAIT);
-  if (n < sizeof(uint32_t)) {
+  if ((uint32_t)n < sizeof(uint32_t)) {
     return false;
   }
 
