@@ -15,7 +15,6 @@ dl_file_t *dl_file_create_and_open(size_t size, const char *path) {
   strcpy(newpath, path);
   strcat(newpath, ".incomplete");
 
-  log_printf(LOG_DEBUG, "OPENING FILE AT %s\n", path);
   int fd = open(path, O_CREAT | O_RDWR, 0777);
   if (fd < 0) {
     goto fail_open;

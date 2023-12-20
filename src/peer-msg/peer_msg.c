@@ -13,7 +13,7 @@
 
 int send_buff(int sockfd, char *buff, size_t bufflen) {
   size_t total_sent = 0;
-  while (total_sent < bufflen) {
+  while (total_sent < bufflen || bufflen == 0) {
     ssize_t n = send(sockfd, buff + total_sent, bufflen - total_sent, 0);
     if (n < 0) {
       log_printf(LOG_ERROR, "Could not send data to peer\n");
@@ -21,7 +21,12 @@ int send_buff(int sockfd, char *buff, size_t bufflen) {
     }
 
     total_sent += n;
+
+    if (bufflen == 0) {
+      break;
+    }
   }
+
   if (total_sent == bufflen) {
     return 0;
   } else {
@@ -153,13 +158,19 @@ int peer_msg_send(int sockfd, peer_msg_t *msg, const metainfo_t *torrent) {
   }
 
   switch (msg->type) {
+  case MSG_KEEPALIVE: {
+    if (send_buff(sockfd, "", 0) < 0) {
+      return -1;
+    }
+  }
   case MSG_CHOKE:
   case MSG_UNCHOKE:
   case MSG_INTERESTED:
   case MSG_NOT_INTERESTED:
     assert(ntohl(len) == 1);
     return 0;
-  case MSG_PIECE: {
+  case MSG_PIECE: { // TODO: Send pieces
+    break;
   }
   case MSG_BITFIELD: {
     assert(msg->payload.bitfield);
@@ -182,7 +193,6 @@ int peer_msg_send(int sockfd, peer_msg_t *msg, const metainfo_t *torrent) {
 
     return 0;
   }
-
   case MSG_HAVE: {
     uint32_t payload = htonl(msg->payload.have);
     return send_buff(sockfd, (char *)&payload, sizeof(uint32_t));
@@ -194,6 +204,8 @@ int peer_msg_send(int sockfd, peer_msg_t *msg, const metainfo_t *torrent) {
   default:
     return -1;
   }
+
+  return 0;
 }
 
 static inline bool valid_len(msg_type_t type, const metainfo_t *torrent,

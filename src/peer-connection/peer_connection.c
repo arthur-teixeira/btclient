@@ -15,9 +15,11 @@
 #include <string.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
 #define PEER_TIMEOUT_SEC 120
+#define PEER_KEEPALIVE_INTERVAL 60
 
 mqd_t peer_queue_open(int flags);
 void queue_cleanup(void *arg);
@@ -527,7 +529,8 @@ int torrent_next_request(metainfo_t *torrent, uint8_t *peer_have_bf,
 // TODO: check values for better performance
 #define PEER_NUM_OUTSTANDING_REQUESTS 1
 
-int send_requests(int sockfd, conn_state_t *state, metainfo_t *torrent) {
+int send_requests(int sockfd, conn_state_t *state, metainfo_t *torrent,
+                  time_t *last_sent_request_time) {
   int n = PEER_NUM_OUTSTANDING_REQUESTS - state->local_requests->len;
   if (n <= 0) {
     return 0;
@@ -560,10 +563,13 @@ int send_requests(int sockfd, conn_state_t *state, metainfo_t *torrent) {
           .begin = br->begin,
       };
 
-     log_printf(LOG_DEBUG, "Sending block request: \n"
-                           "    piece_index: %ld\n"
-                           "    length: %ld\n"
-                           "    begin: %ld\n", request->piece_index, br->len, br->begin);
+      *last_sent_request_time = time(NULL);
+      log_printf(LOG_DEBUG,
+                 "Sending block request: \n"
+                 "    piece_index: %ld\n"
+                 "    length: %ld\n"
+                 "    begin: %ld\n",
+                 request->piece_index, br->len, br->begin);
       if (peer_msg_send(sockfd, &to_send, torrent) < 0) {
         return -1;
       }
@@ -633,6 +639,7 @@ void *peer_connection(void *arg) {
 
         unchoke(sockfd, state, parg->torrent);
         time_t last_msg_time = time(NULL);
+        time_t last_sent_request_time = -1;
         while (true) {
           time_t curr = time(NULL);
           if (curr - last_msg_time > PEER_TIMEOUT_SEC) {
@@ -640,9 +647,22 @@ void *peer_connection(void *arg) {
                        ipstr);
             goto abort_conn;
           }
+          if (last_sent_request_time >= 0 &&
+              curr - last_sent_request_time > PEER_KEEPALIVE_INTERVAL) {
+            log_printf(LOG_INFO, "A minute has passed since the last request, "
+                                 "sending keep-alive msg\n");
+            peer_msg_t keepalive_msg;
+            keepalive_msg.type = MSG_KEEPALIVE;
+            if (peer_msg_send(sockfd, &keepalive_msg, parg->torrent) < 0) {
+              goto abort_conn;
+            }
+
+            last_sent_request_time = time(NULL);
+          }
 
           pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
-          usleep(250000);
+          pthread_testcancel();
+          // usleep(250000);
           pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
 
           service_have_events(sockfd, queue, parg->torrent, state->local_have);
@@ -656,7 +676,8 @@ void *peer_connection(void *arg) {
             service_peer_requests(sockfd, state, parg->torrent);
           } else {
             if (!state->local.choked && state->local.interested) {
-              if (send_requests(sockfd, state, parg->torrent) < 0) {
+              if (send_requests(sockfd, state, parg->torrent,
+                                &last_sent_request_time) < 0) {
                 goto abort_conn;
               }
             }

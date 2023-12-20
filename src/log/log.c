@@ -56,16 +56,6 @@ void log_printf(log_level_t lvl, const char *fmt, ...) {
 
   fprintf(log_file, "[%s] - [%.*s] [%05ld] ", print_level(lvl) + 4, 8, timestr,
           tid);
-  switch (lvl) {
-  case LOG_WARNING:
-    fprintf(log_file, "WARNING: ");
-    break;
-  case LOG_ERROR:
-    fprintf(log_file, "ERROR: ");
-    break;
-  default:
-    break;
-  }
 
   va_start(args, fmt);
   vfprintf(log_file, fmt, args);
