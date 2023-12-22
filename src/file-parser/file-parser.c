@@ -144,25 +144,41 @@ metainfo_t parse_file(char *filename) {
   metainfo.sh.peer_connections = malloc(sizeof(peer_connections_t));
   da_init(metainfo.sh.peer_connections, sizeof(peer_connection_t));
 
-  metainfo.files = calloc(metainfo.info.files_count, sizeof(dl_file_t *));
-  for (size_t i = 0; i < metainfo.info.files_count; i++) {
-    file_info_t *cur_file = &metainfo.info.files[i];
+  if (metainfo.info.mode == INFO_MULTI) {
+    metainfo.files = calloc(metainfo.info.files_count, sizeof(dl_file_t *));
+    for (size_t i = 0; i < metainfo.info.files_count; i++) {
+      file_info_t *cur_file = &metainfo.info.files[i];
+      char path[512];
+      strcpy(path, "./");
+      strcat(path, metainfo.info.name);
+      strcat(path, "/");
+      mkdir(path, 0777);
+
+      for (size_t j = 0; j < cur_file->path_size; j++) {
+        strcat(path, cur_file->path[j]);
+        if (j < cur_file->path_size - 1) {
+          mkdir(path, 0777);
+          strcat(path, "/");
+        }
+      }
+      log_printf(LOG_INFO, "Target file: %s\n", path);
+      metainfo.files[i] = dl_file_create_and_open(cur_file->length, path);
+    }
+  } else {
+    assert(metainfo.info.mode == INFO_SINGLE);
     char path[512];
     strcpy(path, "./");
     strcat(path, metainfo.info.name);
-    strcat(path, "/");
-    mkdir(path, 0777);
+    metainfo.info.files_count = 1;
+    metainfo.info.files =
+        calloc(metainfo.info.files_count, sizeof(file_info_t));
+    metainfo.info.files[0] = (file_info_t){
+        .length = metainfo.info.length,
+        .path = (char *[]){path},
+    };
 
-
-    for (size_t j = 0; j < cur_file->path_size; j++) {
-      strcat(path, cur_file->path[j]);
-      if (j < cur_file->path_size - 1) {
-        mkdir(path, 0777);
-        strcat(path, "/");
-      }
-    }
-    log_printf(LOG_INFO, "Target file: %s\n", path);
-    metainfo.files[i] = dl_file_create_and_open(cur_file->length, path);
+    metainfo.files = calloc(1, sizeof(peer_connections_t));
+    metainfo.files[0] = dl_file_create_and_open(metainfo.info.length, path);
   }
 
   return metainfo;

@@ -6,6 +6,7 @@
 #include "tracker/tracker_request.h"
 #include "url/url.h"
 #include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <time.h>
 
@@ -45,12 +46,14 @@ int create_peer_connection(peer_t *peer, metainfo_t *torrent) {
 }
 
 int main(int argc, char **argv) {
+  signal(SIGPIPE, SIG_IGN);
   if (argc < 2) {
     printf("usage: %s [file name]\n", argv[0]);
     return 0;
   }
   srand(time(NULL));
   create_peer_id();
+  FILE *log = fopen("./out.log", "a");
   log_set_logfile(stdout);
   log_set_lvl(LOG_DEBUG);
 
@@ -70,6 +73,12 @@ int main(int argc, char **argv) {
       started = true;
     }
 
+    bool read_completed = file.sh.completed;
+    if (!completed && read_completed) {
+      req->event = EVENT_COMPLETED;
+    }
+    completed = read_completed;
+
     tracker_response_t *res = tracker_announce(&announce_url, req);
     if (res) {
       log_printf(LOG_DEBUG, "Tracker interval is %ld\n", res->interval);
@@ -77,6 +86,8 @@ int main(int argc, char **argv) {
       for (size_t i = 0; i < res->num_peers; i++) {
         create_peer_connection(&res->peers[i], &file);
       }
+      log_printf(LOG_INFO, "%ld connected peers\n",
+                 file.sh.peer_connections->len);
     } else {
       interval = TRACKER_RETRY_INTERVAL;
       log_printf(LOG_INFO, "Retrying announce to tracker in %d seconds\n",
